@@ -1,7 +1,7 @@
 using Application.Contracts;
 using Domain;
 using MediatR;
-using Sahred.Command;
+using Shared.Command;
 
 namespace Application.Features.Questions;
 

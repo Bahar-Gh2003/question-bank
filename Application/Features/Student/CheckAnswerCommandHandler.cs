@@ -2,7 +2,7 @@ using Application.Common;
 using Application.Contracts;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Sahred.Student;
+using Shared.Student;
 
 namespace Application.Features.Student;
 

@@ -1,5 +1,5 @@
 using MediatR;
-using Sahred;
+using Shared;
 
 namespace Application.Features.Student;
 

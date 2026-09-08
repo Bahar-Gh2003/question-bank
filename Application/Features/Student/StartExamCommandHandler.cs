@@ -4,8 +4,8 @@ using Application.Services;
 using Domain;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Sahred;
-using Sahred.Student;
+using Shared;
+using Shared.Student;
 
 namespace Application.Features.Student;
 

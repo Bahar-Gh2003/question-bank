@@ -2,8 +2,8 @@ using Application.Contracts;
 using Domain;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Sahred;
-using Sahred.Command;
+using Shared;
+using Shared.Command;
 
 namespace Application.Features.Questions;
 

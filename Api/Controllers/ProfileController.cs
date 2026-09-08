@@ -3,8 +3,8 @@ using Application.Features.Profile;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Sahred;
-using Sahred.Student;
+using Shared;
+using Shared.Student;
 
 namespace Api.Controllers;
 

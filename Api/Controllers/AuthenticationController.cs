@@ -1,7 +1,7 @@
 using Application.Features.Authentication;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using Sahred;
+using Shared;
 
 namespace Api.Controllers;
 

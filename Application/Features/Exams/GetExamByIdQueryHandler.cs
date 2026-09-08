@@ -1,6 +1,6 @@
 using Application.Contracts;
 using MediatR;
-using Sahred.Admin;
+using Shared.Admin;
 
 namespace Application.Features.Exams;
 

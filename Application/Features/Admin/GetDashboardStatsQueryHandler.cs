@@ -1,7 +1,7 @@
 using Application.Contracts;
 using Domain;
 using MediatR;
-using Sahred.Admin;
+using Shared.Admin;
 
 namespace Application.Features.Admin;
 

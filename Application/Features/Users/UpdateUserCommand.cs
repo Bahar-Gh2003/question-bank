@@ -1,5 +1,5 @@
 using MediatR;
-using Sahred.Admin;
+using Shared.Admin;
 
 namespace Application.Features.Users;
 

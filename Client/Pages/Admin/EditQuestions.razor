@@ -1,9 +1,9 @@
 @page "/admin/edit-question/{QuestionId:guid}"
 @attribute [Authorize(Roles = "Admin")]
 @using Domain
-@using Sahred
-@using Sahred.Admin
-@using Sahred.Command
+@using Shared
+@using Shared.Admin
+@using Shared.Command
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager

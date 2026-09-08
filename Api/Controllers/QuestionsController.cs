@@ -2,8 +2,8 @@ using Application.Features.Questions;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Sahred.Admin;
-using Sahred.Command;
+using Shared.Admin;
+using Shared.Command;
 
 namespace Api.Controllers;
 

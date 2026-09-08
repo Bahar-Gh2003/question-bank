@@ -1,8 +1,8 @@
 using Application.Contracts;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Sahred;
-using Sahred.Admin;
+using Shared;
+using Shared.Admin;
 
 namespace Application.Features.Admin;
 

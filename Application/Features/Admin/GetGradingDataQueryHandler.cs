@@ -3,7 +3,7 @@ using Application.Contracts;
 using Domain;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Sahred.Admin;
+using Shared.Admin;
 
 namespace Application.Features.Admin;
 

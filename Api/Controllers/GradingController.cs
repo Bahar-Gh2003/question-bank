@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Threading.Tasks;
 using Application.Features.Admin;
-using Sahred.Admin;
+using Shared.Admin;
 
 namespace Api.Controllers;
 

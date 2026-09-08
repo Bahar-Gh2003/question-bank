@@ -2,7 +2,7 @@ using Application.Features.Users;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Sahred.Admin;
+using Shared.Admin;
 
 namespace Api.Controllers;
 

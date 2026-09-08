@@ -2,7 +2,7 @@ using Application.Contracts;
 using Domain;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Sahred.Command;
+using Shared.Command;
 
 namespace Application.Features.Questions;
 
