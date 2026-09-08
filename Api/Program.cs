@@ -62,6 +62,7 @@ builder.Services.AddAuthentication(opt =>
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+app.UseMiddleware<Api.Middleware.ExceptionHandlingMiddleware>();
 
 // ۶. پایپ‌لاین Middleware
 if (app.Environment.IsDevelopment())

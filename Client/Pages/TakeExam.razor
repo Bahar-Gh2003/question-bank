@@ -10,15 +10,21 @@
 @inject ISnackbar Snackbar
 @implements IDisposable
 
-@* @implements IDisposable *@
-
 <PageTitle>شرکت در آزمون</PageTitle>
+
 @if (_isLoading)
 {
     <MudText>در حال آماده‌سازی آزمون...</MudText>
     <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
 }
-else if (_examSession != null)
+else if (_loadError is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mt-4">@_loadError</MudAlert>
+    <MudButton Variant="Variant.Filled" Class="mt-4" OnClick="@(() => NavigationManager.NavigateTo("/exams"))">
+        بازگشت به لیست آزمون‌ها
+    </MudButton>
+}
+else if (_examSession is not null)
 {
     var currentQuestion = _examSession.Questions[_currentQuestionIndex];
 
@@ -26,15 +32,16 @@ else if (_examSession != null)
         <MudText Typo="Typo.h4">@_examSession.ExamTitle</MudText>
         <MudChip T="string" Color="Color.Error" Variant="Variant.Text" Size="Size.Large">@_timeRemainingDisplay</MudChip>
     </div>
-    
-    <MudText Typo="Typo.h6" Class="mt-4">سوال @((_currentQuestionIndex + 1).ToPersianDigits()) از @_examSession.Questions.Count.ToPersianDigits()</MudText>
-    
+
+    <MudText Typo="Typo.h6" Class="mt-4">
+        سوال @((_currentQuestionIndex + 1).ToPersianDigits()) از @_examSession.Questions.Count.ToPersianDigits()
+    </MudText>
+
     <MudPaper Elevation="3" Class="pa-4 mt-4">
-        @* --- This is the corrected image display section --- *@
         @if (!string.IsNullOrEmpty(currentQuestion.ImageUrl))
         {
             <div class="d-flex justify-center mb-4">
-                <img src="@(ApiBaseUrl + currentQuestion.ImageUrl + "?t=" + DateTime.Now.Ticks)" style="max-height: 200px; max-width: 100%;" />
+                <img src="@(ApiBaseUrl + currentQuestion.ImageUrl)" style="max-height: 200px; max-width: 100%;" />
             </div>
         }
         <MudText>@currentQuestion.Content</MudText>
@@ -45,8 +52,9 @@ else if (_examSession != null)
         <MudRadioGroup T="Guid?"
                        @key="currentQuestion.QuestionId"
                        ValueChanged="OnAnswerSelected"
-                       Value="@_multipleChoiceAnswers.GetValueOrDefault(currentQuestion.QuestionId)"
-                       Disabled="@IsQuestionLocked(currentQuestion.QuestionId)" Class="vertical-radio-group">
+                       Value="@currentQuestion.SelectedOptionId"
+                       Disabled="@(currentQuestion.IsLocked || _isCheckingAnswer)"
+                       Class="vertical-radio-group">
             @foreach (var option in currentQuestion.Options)
             {
                 <MudRadio T="Guid?" Value="@option.Id">@option.Content</MudRadio>
@@ -56,7 +64,9 @@ else if (_examSession != null)
     else
     {
         <div class="mirror-field">
-        <MudTextField @bind-Value="@_shortAnswerTexts[currentQuestion.QuestionId]" Label="پاسخ خود را اینجا وارد کنید" Variant="Variant.Outlined" Lines="3" Class="mt-4" />
+            <MudTextField @bind-Value="@_shortAnswerTexts[currentQuestion.QuestionId]"
+                          Label="پاسخ خود را اینجا وارد کنید"
+                          Variant="Variant.Outlined" Lines="3" Class="mt-4" />
         </div>
     }
 
@@ -72,92 +82,114 @@ else if (_examSession != null)
         }
         else
         {
-            <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="FinishExam" Disabled="@_isSubmitting">پایان آزمون</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="FinishExam" Disabled="@_isSubmitting">
+                پایان آزمون
+            </MudButton>
         }
-        <MudButton Variant="Variant.Filled" OnClick="PreviousQuestion" Disabled="@(_currentQuestionIndex == 0)">سوال قبل</MudButton>
-
+        <MudButton Variant="Variant.Filled" OnClick="PreviousQuestion" Disabled="@(_currentQuestionIndex == 0)">
+            سوال قبل
+        </MudButton>
     </div>
 }
 
 @code {
     [Parameter] public Guid ExamId { get; set; }
 
-    private ExamSessionDto? _examSession;
-    private int _currentQuestionIndex = 0;
+    // TODO: این باید از appsettings کلاینت خوانده شود، نه hardcode
     private const string ApiBaseUrl = "https://localhost:7210";
 
-    private Dictionary<Guid, Guid?> _multipleChoiceAnswers = new();
-    private Dictionary<Guid, string> _shortAnswerTexts = new();
+    private ExamSessionDto? _examSession;
+    private string? _loadError;
+    private int _currentQuestionIndex;
 
-    private Dictionary<Guid, int> _questionAttempts = new();
-    private Dictionary<Guid, bool> _correctlyAnswered = new();
+    private readonly Dictionary<Guid, string> _shortAnswerTexts = new();
 
     private string? _feedbackMessage;
     private Severity _feedbackSeverity = Severity.Normal;
 
-    private bool _isSubmitting = false;
+    private bool _isSubmitting;
+    private bool _isCheckingAnswer;
     private bool _isLoading = true;
+
     private Timer? _timer;
     private string _timeRemainingDisplay = "00:00";
     private TimeSpan _timeRemaining;
-    // private DateTime _examAbsoluteEndTime;
 
     protected override async Task OnInitializedAsync()
     {
-        _examSession = await Http.GetFromJsonAsync<ExamSessionDto>($"api/student/take-exam/{ExamId}");
-        if (_examSession != null && _examSession.Questions.Any())
+        // سرور جلسه را می‌سازد (یا اگر جلسه بازی هست، همان را برمی‌گرداند)
+        var response = await Http.PostAsync($"api/student/start-exam/{ExamId}", null);
+
+        if (!response.IsSuccessStatusCode)
         {
-            foreach (var q in _examSession.Questions.Where(q => q.Type == QuestionType.ShortAnswer))
-            {
-                _shortAnswerTexts[q.QuestionId] = "";
-            }
-            _timeRemaining = TimeSpan.FromMinutes(_examSession.DurationInMinutes);
-            StartTimer();
+            _loadError = await ReadErrorMessageAsync(response, "امکان شروع این آزمون وجود ندارد.");
+            _isLoading = false;
+            return;
         }
+
+        _examSession = await response.Content.ReadFromJsonAsync<ExamSessionDto>();
+
+        if (_examSession is null || _examSession.Questions.Count == 0)
+        {
+            _loadError = "سوالی برای این آزمون یافت نشد.";
+            _isLoading = false;
+            return;
+        }
+
+        foreach (var q in _examSession.Questions.Where(q => q.Type == QuestionType.ShortAnswer))
+        {
+            _shortAnswerTexts[q.QuestionId] = q.ShortAnswerText ?? "";
+        }
+
+        // زمان باقی‌مانده را سرور تعیین می‌کند، نه مرورگر
+        _timeRemaining = TimeSpan.FromSeconds(_examSession.RemainingSeconds);
+        _timeRemainingDisplay = _timeRemaining.ToString(@"mm\:ss");
+        StartTimer();
 
         _isLoading = false;
     }
 
-    private void OnAnswerSelected(Guid? selectedOptionId)
+    private async Task OnAnswerSelected(Guid? selectedOptionId)
     {
-        if (!selectedOptionId.HasValue) return;
+        if (!selectedOptionId.HasValue || _isCheckingAnswer) return;
 
-        var currentQuestion = _examSession.Questions[_currentQuestionIndex];
-        var questionId = currentQuestion.QuestionId;
+        var question = _examSession!.Questions[_currentQuestionIndex];
+        if (question.IsLocked) return;
 
-        if (IsQuestionLocked(questionId)) return;
-
-        _multipleChoiceAnswers[questionId] = selectedOptionId;
-
-        var attempts = _questionAttempts.GetValueOrDefault(questionId, 0) + 1;
-        _questionAttempts[questionId] = attempts;
-
-        if (selectedOptionId.Value == currentQuestion.CorrectOptionId)
+        _isCheckingAnswer = true;
+        try
         {
-            _feedbackMessage = "آفرین! پاسخ شما صحیح است.";
-            _feedbackSeverity = Severity.Success;
-            _correctlyAnswered[questionId] = true;
+            // تصمیم درست/غلط را سرور می‌گیرد — پاسخ صحیح هرگز به مرورگر نمی‌آید
+            var response = await Http.PostAsJsonAsync("api/student/check-answer", new CheckAnswerDto
+            {
+                AttemptId = _examSession.AttemptId,
+                QuestionId = question.QuestionId,
+                SelectedOptionId = selectedOptionId.Value
+            });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(await ReadErrorMessageAsync(response, "خطا در ثبت پاسخ."), Severity.Error);
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<CheckAnswerResultDto>();
+            if (result is null) return;
+
+            question.SelectedOptionId = selectedOptionId;
+            question.AttemptsUsed = result.AttemptsUsed;
+            question.IsLocked = result.IsLocked;
+
+            _feedbackMessage = result.Message;
+            _feedbackSeverity = result.IsCorrect
+                ? Severity.Success
+                : result.IsLocked ? Severity.Error : Severity.Warning;
         }
-        else
+        finally
         {
-            if (attempts == 1)
-            {
-                _feedbackMessage = "پاسخ شما صحیح نبود. یک بار دیگر فرصت دارید.";
-                _feedbackSeverity = Severity.Warning;
-            }
-            else
-            {
-                _feedbackMessage = "پاسخ شما صحیح نبود. این سوال قفل شد.";
-                _feedbackSeverity = Severity.Error;
-            }
+            _isCheckingAnswer = false;
+            StateHasChanged();
         }
-
-        StateHasChanged();
-    }
-
-    private bool IsQuestionLocked(Guid questionId)
-    {
-        return _correctlyAnswered.ContainsKey(questionId) || _questionAttempts.GetValueOrDefault(questionId, 0) >= 2;
     }
 
     private void GoToQuestion()
@@ -168,7 +200,7 @@ else if (_examSession != null)
 
     private void NextQuestion()
     {
-        if (_currentQuestionIndex < _examSession.Questions.Count - 1)
+        if (_currentQuestionIndex < _examSession!.Questions.Count - 1)
         {
             _currentQuestionIndex++;
             GoToQuestion();
@@ -189,29 +221,27 @@ else if (_examSession != null)
         if (_isSubmitting) return;
         _isSubmitting = true;
         _timer?.Stop();
-        // SaveCurrentAnswer();
 
         var submission = new SubmitExamDto
         {
-            ExamId = this.ExamId,
-            MultipleChoiceAnswers = _multipleChoiceAnswers,
+            AttemptId = _examSession!.AttemptId,
             ShortAnswerTexts = _shortAnswerTexts
         };
+
         var response = await Http.PostAsJsonAsync("api/student/submit-exam", submission);
 
         if (response.IsSuccessStatusCode)
         {
             var result = await response.Content.ReadFromJsonAsync<ExamResultDto>();
-            if (result != null)
+            if (result is not null)
             {
                 NavigationManager.NavigateTo($"/exam-result/{result.IsPassed}/{result.TotalScore}");
+                return;
             }
         }
-        else
-        {
-            Snackbar.Add("خطا در ثبت نهایی آزمون.", Severity.Error);
-            _isSubmitting = false;
-        }
+
+        Snackbar.Add(await ReadErrorMessageAsync(response, "خطا در ثبت نهایی آزمون."), Severity.Error);
+        _isSubmitting = false;
     }
 
     private void StartTimer()
@@ -224,20 +254,39 @@ else if (_examSession != null)
     private async void OnTimerElapsed(object? sender, ElapsedEventArgs e)
     {
         if (_isSubmitting) return;
+
         _timeRemaining = _timeRemaining.Subtract(TimeSpan.FromSeconds(1));
-        _timeRemainingDisplay = _timeRemaining.ToString(@"mm\:ss");
+        _timeRemainingDisplay = _timeRemaining > TimeSpan.Zero
+            ? _timeRemaining.ToString(@"mm\:ss")
+            : "00:00";
+
         if (_timeRemaining.TotalSeconds <= 0)
         {
             _timer?.Stop();
             await InvokeAsync(FinishExam);
+            return;
         }
 
         await InvokeAsync(StateHasChanged);
-        }
-        //
-        public void Dispose()
+    }
+
+    private static async Task<string> ReadErrorMessageAsync(HttpResponseMessage response, string fallback)
+    {
+        try
         {
-        _timer?.Dispose();
+            var problem = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+            return string.IsNullOrWhiteSpace(problem?.Message) ? fallback : problem.Message;
+        }
+        catch
+        {
+            return fallback;
         }
     }
 
+    private class ErrorResponse
+    {
+        public string? Message { get; set; }
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

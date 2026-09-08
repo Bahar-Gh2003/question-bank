@@ -3,9 +3,10 @@ using Sahred.Student;
 
 namespace Application.Features.Student;
 
-public class SubmitExamCommand : IRequest<ExamResultDto>
+public class CheckAnswerCommand : IRequest<CheckAnswerResultDto>
 {
     public Guid UserId { get; set; }
     public Guid AttemptId { get; set; }
-    public Dictionary<Guid, string> ShortAnswerTexts { get; set; } = new();
+    public Guid QuestionId { get; set; }
+    public Guid SelectedOptionId { get; set; }
 }

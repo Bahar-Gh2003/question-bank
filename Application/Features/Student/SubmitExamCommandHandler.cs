@@ -1,83 +1,86 @@
+using Application.Common;
 using Application.Contracts;
-using Domain;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Sahred.Student;
 
 namespace Application.Features.Student;
 
+/// <summary>
+/// آزمون را نهایی می‌کند. کلاینت فقط AttemptId و پاسخ‌های تشریحی را می‌فرستد؛
+/// پاسخ‌های تستی از قبل در سرور ذخیره شده‌اند و دوباره از کلاینت پذیرفته نمی‌شوند.
+/// </summary>
 public class SubmitExamCommandHandler : IRequestHandler<SubmitExamCommand, ExamResultDto>
 {
-    private readonly IUnitOfWork _unitOfWork;
+    /// <summary>چند ثانیه ارفاق برای تأخیر شبکه هنگام ثبت خودکار در لحظه پایان.</summary>
+    private const int GracePeriodSeconds = 30;
 
-    public SubmitExamCommandHandler(IUnitOfWork unitOfWork)
-    {
-        _unitOfWork = unitOfWork;
-    }
+    private readonly IUnitOfWork _unitOfWork;
+    public SubmitExamCommandHandler(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
 
     public async Task<ExamResultDto> Handle(SubmitExamCommand request, CancellationToken cancellationToken)
     {
-        var exam = await _unitOfWork.ExamRepository.GetByIdAsync(request.ExamId, include: q => q.Include(e => e.Level));
-        if (exam == null) throw new Exception("آزمون یافت نشد.");
+        var utcNow = DateTime.UtcNow;
 
-        var attempt = new ExamAttempt
-        {
-            UserId = request.UserId,
-            ExamId = request.ExamId,
-            LevelId = exam.LevelId,
-            AttemptedAt = DateTime.UtcNow
-        };
+        var attempt = await _unitOfWork.ExamAttemptRepository.GetByIdAsync(
+            request.AttemptId,
+            include: a => a.Include(x => x.StudentAnswers)
+                           .Include(x => x.Exam).ThenInclude(e => e.Level));
 
-        // ذخیره پاسخ‌ها
-        foreach (var answer in request.MultipleChoiceAnswers)
-        {
-            attempt.StudentAnswers.Add(new StudentAnswer { QuestionId = answer.Key, SelectedOptionId = answer.Value });
-        }
-        foreach (var answer in request.ShortAnswerTexts)
-        {
-            attempt.StudentAnswers.Add(new StudentAnswer { QuestionId = answer.Key, ShortAnswerText = answer.Value });
-        }
-        
-        await _unitOfWork.ExamAttemptRepository.AddAsync(attempt);
+        if (attempt is null)
+            throw new NotFoundException("جلسه آزمون یافت نشد.");
 
-        // تصحیح آزمون
-        int totalScore = 0;
-        var questionIds = attempt.StudentAnswers.Select(a => a.QuestionId).ToList();
-        var questions = await _unitOfWork.QuestionRepository.GetAllAsync(
-            predicate: q => questionIds.Contains(q.Id),
-            include: q => q.Include(o => o.Options)
-        );
+        if (attempt.UserId != request.UserId)
+            throw new ForbiddenException("شما به این جلسه آزمون دسترسی ندارید.");
 
-        foreach (var studentAnswer in attempt.StudentAnswers)
+        if (attempt.IsCompleted)
+            throw new BusinessRuleException("این آزمون قبلاً ثبت شده است.");
+
+        var endsAt = attempt.StartedAt.AddMinutes(attempt.Exam.DurationInMinutes);
+        var isLate = utcNow > endsAt.AddSeconds(GracePeriodSeconds);
+
+        // پاسخ‌های تشریحی فقط اگر در مهلت باشند پذیرفته می‌شوند
+        if (!isLate)
         {
-            var question = questions.First(q => q.Id == studentAnswer.QuestionId);
-            if (question.Type == QuestionType.MultipleChoice)
+            foreach (var (questionId, text) in request.ShortAnswerTexts)
             {
-                var correctOptionId = question.Options.FirstOrDefault(o => o.IsCorrect)?.Id;
-                studentAnswer.IsCorrect = studentAnswer.SelectedOptionId == correctOptionId;
-                if (studentAnswer.IsCorrect == true)
-                {
-                    totalScore += question.Score;
-                }
+                var answer = attempt.StudentAnswers.FirstOrDefault(a => a.QuestionId == questionId);
+                if (answer is null) continue;  // سوالی که جزو این آزمون نبوده، نادیده گرفته می‌شود
+                answer.ShortAnswerText = text;
             }
         }
-        
-        attempt.Score = totalScore;
-        attempt.IsPassed = totalScore >= exam.PassingScore;
 
-        // منطق ارتقای سطح
-        if (attempt.IsPassed)
+        // نمره‌دهی فقط بر اساس داده‌های سرور
+        var questionIds = attempt.StudentAnswers.Select(a => a.QuestionId).ToList();
+        var questions = await _unitOfWork.QuestionRepository.GetAllAsync(
+            predicate: q => questionIds.Contains(q.Id));
+
+        var totalScore = attempt.StudentAnswers
+            .Where(a => a.IsCorrect == true)
+            .Sum(a => questions.First(q => q.Id == a.QuestionId).Score);
+
+        attempt.Score = totalScore;
+        attempt.IsPassed = totalScore >= attempt.Exam.PassingScore;
+        attempt.AttemptedAt = isLate ? endsAt : utcNow;
+        attempt.IsCompleted = true;
+
+        // ارتقای سطح
+        if (attempt.IsPassed && attempt.Exam.Level is not null)
         {
-            var student = await _unitOfWork.UserRepository.GetByIdAsync(request.UserId);
-            var nextLevel = await _unitOfWork.LevelRepository.FindFirstOrDefaultAsync(l => l.LevelNumber == exam.Level.LevelNumber + 1);
-            if (student != null && nextLevel != null)
+            var student = await _unitOfWork.UserRepository.GetByIdAsync(attempt.UserId);
+            var nextLevel = await _unitOfWork.LevelRepository.FindFirstOrDefaultAsync(
+                l => l.LevelNumber == attempt.Exam.Level.LevelNumber + 1);
+
+            if (student is not null && nextLevel is not null)
             {
                 student.CurrentLevelId = nextLevel.Id;
                 _unitOfWork.UserRepository.Update(student);
             }
         }
-        
+
+        _unitOfWork.ExamAttemptRepository.Update(attempt);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
         return new ExamResultDto { TotalScore = totalScore, IsPassed = attempt.IsPassed };
     }
 }

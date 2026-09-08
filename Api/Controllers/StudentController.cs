@@ -19,70 +19,82 @@ public class StudentController : ControllerBase
         _mediator = mediator;
     }
 
+    private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
     [HttpGet("exams")]
     public async Task<IActionResult> GetAvailableExams()
     {
-        var userId = new Guid(User.FindFirstValue(ClaimTypes.NameIdentifier));
-        var query = new GetAvailableExamsQuery { UserId = userId };
-        var exams = await _mediator.Send(query);
+        var exams = await _mediator.Send(new GetAvailableExamsQuery { UserId = CurrentUserId });
         return Ok(exams);
     }
 
-    [HttpGet("take-exam/{examId:guid}")]
-    public async Task<IActionResult> GetExamQuestions(Guid examId)
+    /// <summary>
+    /// جایگزین GET take-exam/{id} شد.
+    /// حالا POST است چون در سرور حالت ایجاد می‌کند، و همه بررسی‌های مجوز اینجا انجام می‌شود.
+    /// </summary>
+    [HttpPost("start-exam/{examId:guid}")]
+    public async Task<ActionResult<ExamSessionDto>> StartExam(Guid examId)
     {
-        var query = new GetExamQuestionsQuery { ExamId = examId };
-        var questions = await _mediator.Send(query);
-        return Ok(questions);
+        var session = await _mediator.Send(new StartExamCommand
+        {
+            UserId = CurrentUserId,
+            ExamId = examId
+        });
+        return Ok(session);
+    }
+
+    /// <summary>بررسی یک پاسخ تستی در سرور. فقط درست/غلط برمی‌گرداند.</summary>
+    [HttpPost("check-answer")]
+    public async Task<ActionResult<CheckAnswerResultDto>> CheckAnswer([FromBody] CheckAnswerDto dto)
+    {
+        var result = await _mediator.Send(new CheckAnswerCommand
+        {
+            UserId = CurrentUserId,
+            AttemptId = dto.AttemptId,
+            QuestionId = dto.QuestionId,
+            SelectedOptionId = dto.SelectedOptionId
+        });
+        return Ok(result);
     }
 
     [HttpPost("submit-exam")]
     public async Task<ActionResult<ExamResultDto>> SubmitExam([FromBody] SubmitExamDto submission)
     {
-        var userId = new Guid(User.FindFirstValue(ClaimTypes.NameIdentifier));
-        var command = new SubmitExamCommand
+        var result = await _mediator.Send(new SubmitExamCommand
         {
-            UserId = userId,
-            ExamId = submission.ExamId,
-            MultipleChoiceAnswers = submission.MultipleChoiceAnswers,
+            UserId = CurrentUserId,
+            AttemptId = submission.AttemptId,
             ShortAnswerTexts = submission.ShortAnswerTexts
-        };
-        var result = await _mediator.Send(command);
+        });
         return Ok(result);
     }
-    
+
     [HttpGet("history")]
     public async Task<IActionResult> GetExamHistory()
     {
-        var userId = new Guid(User.FindFirstValue(ClaimTypes.NameIdentifier));
-        var query = new GetUserExamHistoryQuery { UserId = userId };
-        var history = await _mediator.Send(query);
+        var history = await _mediator.Send(new GetUserExamHistoryQuery { UserId = CurrentUserId });
         return Ok(history);
     }
 
-    // [HttpGet("ranking/{examId:guid}")]
-    // [AllowAnonymous]
-    // public async Task<IActionResult> GetRankingForExam(Guid examId)
-    // {
-    //     var ranking = await _mediator.Send(new GetRankingForExamQuery { ExamId = examId });
-    //     return Ok(ranking);
-    // }
-    
     [HttpGet("review/{attemptId:guid}")]
     public async Task<ActionResult<ExamReviewDto>> GetExamReview(Guid attemptId)
     {
-        var userId = new Guid(User.FindFirstValue(ClaimTypes.NameIdentifier));
-        var query = new GetExamReviewQuery { AttemptId = attemptId, UserId = userId };
-        var reviewData = await _mediator.Send(query);
+        var reviewData = await _mediator.Send(new GetExamReviewQuery
+        {
+            AttemptId = attemptId,
+            UserId = CurrentUserId
+        });
         return Ok(reviewData);
     }
-    
+
     [HttpGet("attempt-status/{attemptId:guid}")]
     public async Task<ActionResult<AttemptStatusDto>> GetAttemptStatus(Guid attemptId)
     {
-        var userId = new Guid(User.FindFirstValue(ClaimTypes.NameIdentifier));
-        var query = new GetAttemptStatusQuery { AttemptId = attemptId, UserId = userId };
-        var status = await _mediator.Send(query);
+        var status = await _mediator.Send(new GetAttemptStatusQuery
+        {
+            AttemptId = attemptId,
+            UserId = CurrentUserId
+        });
         return Ok(status);
     }
 }
