@@ -1,0 +1,168 @@
+@page "/profile"
+@attribute [Authorize(Roles = "Student, Admin")]
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Sahred
+@using Client.Helpers
+@using Sahred.Student
+@inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ISnackbar Snackbar
+
+<PageTitle>پروفایل کاربری</PageTitle>
+
+@* <MudText Typo="Typo.h4" GutterBottom="true">پروفایل شما</MudText> *@
+
+@if (_profile == null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-4 mt-4">
+        <MudGrid Spacing="4">
+            @* --- بخش عکس پروفایل --- *@
+            <MudItem xs="12" sm="4" Class="d-flex flex-column align-center">
+                <MudAvatar Style="height:150px; width:150px;">
+                    <img src="@_imageUrlToDisplay" style="width: 100%; height: 100%; object-fit: cover;" />
+                </MudAvatar>
+
+                <InputFile OnChange="OnFileSelected" accept="image/*" hidden id="fileInput" />
+                <MudButton HtmlTag="label"
+                           Variant="Variant.Filled"
+                           Color="Color.Default"
+                           StartIcon="@Icons.Material.Filled.CloudUpload"
+                           for="fileInput"
+                           Class="mb-4">
+                    تغییر عکس
+                </MudButton>
+            </MudItem>
+
+            <MudItem xs="12" sm="8">
+                <MudGrid>
+                    <div class="mirror-field">
+                        
+                        <MudTextField @bind-Value="@_profile.FullName" Label="نام کامل" Variant="Variant.Outlined" Class="mt-4"/>
+                        <MudTextField @bind-Value="@_profile.Username" Label="نام کاربری" ReadOnly="true" Variant="Variant.Outlined" Class="mt-4"/>
+                        <MudTextField @bind-Value="@_profile.Email" Label="ایمیل" Variant="Variant.Outlined" Class="mt-4"/>
+                        @* <MudTextField @bind-Value="@_profile.PhoneNumber" Label="شماره موبایل" Variant="Variant.Outlined" /> *@
+                        @* <MudText>تاریخ تولد: @ToPersianDateString(_profile.DateOfBirth)</MudText> *@
+
+                        @if (_isStudent)
+                        {
+                            <MudTextField @bind-Value="@_profile.CurrentLevelTitle" Label="سطح فعلی" ReadOnly="true" Variant="Variant.Outlined" Class="mt-4"/>
+                        }
+                    </div>
+                </MudGrid>
+            </MudItem>
+            
+        </MudGrid>
+        <div class="d-flex justify-space-between mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="HandleUpdateProfile">ذخیره تغییرات</MudButton>
+            <MudButton Href="/" Variant="Variant.Outlined">بازگشت</MudButton>
+        </div>
+    </MudPaper>
+}
+
+@code {
+    private const string ApiBaseUrl = "https://localhost:7210"; // آدرس API شما
+    private ProfileDto? _profile;
+    private bool _isStudent = false;
+    private IBrowserFile? _selectedFile;
+    
+    // ما فقط از این یک متغیر برای نمایش عکس استفاده می‌کنیم
+    private string _imageUrlToDisplay = "images/default-avatar.png";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        _isStudent = user.IsInRole("Student");
+        
+        await LoadProfile();
+    }
+
+    private async Task LoadProfile()
+    {
+        _profile = await Http.GetFromJsonAsync<ProfileDto>("api/profile");
+        if (!string.IsNullOrEmpty(_profile?.ProfilePictureUrl))
+        {
+            _imageUrlToDisplay = ApiBaseUrl + _profile.ProfilePictureUrl;
+        }
+        else
+        {
+            _imageUrlToDisplay = "images/default-avatar.png";
+        }
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        _selectedFile = e.File;
+        if (_selectedFile == null) return;
+
+        // پیش‌نمایش را ساخته و مستقیماً در متغیر اصلی نمایش قرار می‌دهیم
+        var buffer = new byte[_selectedFile.Size];
+        await _selectedFile.OpenReadStream(long.MaxValue).ReadAsync(buffer);
+        var imageBase64 = Convert.ToBase64String(buffer);
+        _imageUrlToDisplay = $"data:{_selectedFile.ContentType};base64,{imageBase64}";
+        
+        StateHasChanged();
+    }
+
+    private async Task HandleUpdateProfile()
+    {
+        if (_profile == null) return;
+
+        // اگر فایل جدیدی انتخاب شده بود، ابتدا آن را آپلود می‌کنیم
+        if (_selectedFile != null)
+        {
+            using var content = new MultipartFormDataContent();
+            using var fileContent = new StreamContent(_selectedFile.OpenReadStream(long.MaxValue));
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(_selectedFile.ContentType);
+            content.Add(content: fileContent, name: "file", fileName: _selectedFile.Name);
+            
+            var uploadResponse = await Http.PostAsync("api/FileUpload", content);
+            if (uploadResponse.IsSuccessStatusCode)
+            {
+                var result = await uploadResponse.Content.ReadFromJsonAsync<UploadResult>();
+                if (result?.Url != null)
+                {
+                    var updatePicDto = new UpdateProfilePictureDto { ImageUrl = result.Url };
+                    await Http.PostAsJsonAsync("api/profile/picture", updatePicDto);
+                    _imageUrlToDisplay = ApiBaseUrl + result.Url;
+                    _selectedFile = null;
+                }
+            }
+            else
+            {
+                Snackbar.Add("خطا در آپلود عکس.", Severity.Error);
+                return;
+            }
+        }
+        
+        var updateDto = new UpdateProfileDto { FullName = _profile.FullName, Email = _profile.Email };
+        var response = await Http.PutAsJsonAsync("api/profile", updateDto);
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add("پروفایل با موفقیت بروزرسانی شد!", Severity.Success);
+            _selectedFile = null; // فایل انتخاب شده را پاک می‌کنیم
+            await LoadProfile(); // پروفایل را دوباره بارگذاری می‌کنیم تا عکس نهایی از سرور نمایش داده شود
+        }
+        else
+        {
+            Snackbar.Add("خطا در بروزرسانی پروفایل.", Severity.Error);
+        }
+    }
+    
+    public class UploadResult { public string? Url { get; set; } }
+    
+    private string ToPersianDateString(DateTime? gregorianDate)
+    {
+        if (!gregorianDate.HasValue)
+            return "";
+        
+        var persianCalendar = new PersianCalendar();
+        var date = gregorianDate.Value;
+        return $"{persianCalendar.GetYear(date)}/{persianCalendar.GetMonth(date):00}/{persianCalendar.GetDayOfMonth(date):00}".ToPersianDigits();
+    }
+}

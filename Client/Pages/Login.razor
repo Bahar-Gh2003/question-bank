@@ -1,0 +1,82 @@
+@page "/login"
+@using Blazored.LocalStorage
+@using System.Security.Claims
+@using Client.Auth
+@using Microsoft.AspNetCore.Components.Authorization
+@using Sahred
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject ILocalStorageService LocalStorage
+@inject AuthenticationStateProvider AuthStateProvider
+
+<MudGrid Justify="Justify.Center" Class="mt-16">
+    <MudItem xs="12" sm="8" md="4">
+        <MudCard Elevation="25">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h5" Align="Align.Center">ورود به سامانه</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <div class="mirror-field">
+                <MudTextField @bind-Value="_userForAuth.Username" Label="نام کاربری" Variant="Variant.Outlined" Class="my-4" />
+                <MudTextField @bind-Value="_userForAuth.Password" Label="رمز عبور" InputType="InputType.Password" Variant="Variant.Outlined" Class="my-4"/>
+                </div>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="HandleLogin">ورود</MudButton>
+            </MudCardActions>
+        </MudCard>
+        <MudText Align="Align.Center" Class="mt-4">
+            حساب کاربری ندارید؟ <MudLink Href="/register">ثبت نام کنید</MudLink>
+        </MudText>
+    </MudItem>
+</MudGrid>
+
+@code {
+
+
+    private readonly UserForAuthenticationDto _userForAuth = new();
+    private bool _isProcessing = false;
+
+    private async Task HandleLogin()
+    {
+        _isProcessing = true;
+        var response = await Http.PostAsJsonAsync("api/auth/login", _userForAuth);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadFromJsonAsync<AuthenticationResponseDto>();
+            if (result?.Token != null)
+            {
+                // ۱. ذخیره توکن
+                await LocalStorage.SetItemAsync("authToken", result.Token);
+
+                // ۲. اطلاع به برنامه که کاربر وارد شده است
+                ((CustomAuthStateProvider)AuthStateProvider).NotifyUserAuthentication(result.Token);
+
+                // ۳. خواندن نقش کاربر از توکن
+                var claims = CustomAuthStateProvider.ParseClaimsFromJwt(result.Token);
+                var role = claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
+
+                // ۴. هدایت بر اساس نقش
+                if (role == "Admin")
+                {
+                    NavigationManager.NavigateTo("/admin/dashboard", forceLoad: true);
+                }
+                else
+                {
+                    NavigationManager.NavigateTo("/", forceLoad: true);
+                }
+            }
+        }
+        else
+        {
+            Snackbar.Add("نام کاربری یا رمز عبور اشتباه است.", Severity.Error);
+            _isProcessing = false;
+        }
+    }
+
+    
+}

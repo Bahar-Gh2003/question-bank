@@ -1,0 +1,164 @@
+@page "/admin/edit-question/{QuestionId:guid}"
+@attribute [Authorize(Roles = "Admin")]
+@using Domain
+@using Sahred
+@using Sahred.Admin
+@using Sahred.Command
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<PageTitle>ویرایش سوال</PageTitle>
+<MudText Typo="Typo.h4" GutterBottom="true">ویرایش سوال</MudText>
+
+@if (_questionModel == null) { <MudProgressCircular Indeterminate="true" /> }
+else
+{
+    <MudPaper Class="pa-6 mt-4">
+        <div class="mirror-field">
+        <MudTextField Label="متن سوال" @bind-Value="_questionModel.Content" Lines="3" Variant="Variant.Outlined"/>
+
+        <MudText Typo="Typo.h6" Class="mt-4">عکس سوال</MudText>
+        @if (!string.IsNullOrEmpty(_previewImageUrl))
+        {
+            <MudCard Class="mt-2" Style="width: 200px;">
+                <MudCardMedia Image="@_previewImageUrl" Height="150"/>
+            </MudCard>
+        }
+        <div class="mt-2">
+            <InputFile OnChange="OnFileSelected" accept="image/*" hidden id="fileInput"/>
+            <MudButton HtmlTag="label" Variant="@Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload" for="fileInput">
+                انتخاب یا تغییر عکس
+            </MudButton>
+        </div>
+
+        <MudSelect T="Guid?" @bind-Value="_questionModel.LevelId" Label="سطح سوال" Variant="Variant.Outlined" Class="mt-4">
+            @if (_levels != null)
+            {
+                foreach (var level in _levels)
+                {
+                    <MudSelectItem T="Guid?" Value="@level.Id">@level.Title</MudSelectItem>
+                }
+            }
+        </MudSelect>
+
+        <MudNumericField @bind-Value="_questionModel.Score" Label="نمره" Variant="Variant.Outlined" Class="mt-4" Min="0"/>
+
+        <MudSelect T="QuestionType" @bind-Value="_questionModel.Type" Label="نوع سوال" Variant="Variant.Outlined" Class="mt-4">
+            <MudSelectItem Value="QuestionType.ShortAnswer">تشریحی</MudSelectItem>
+            <MudSelectItem Value="QuestionType.MultipleChoice">تستی</MudSelectItem>
+        </MudSelect>
+
+        @if (_questionModel.Type == QuestionType.MultipleChoice)
+        {
+            <MudText Typo="Typo.h6" Class="mt-6">گزینه‌ها</MudText>
+            @foreach (var option in _questionModel.Options)
+            {
+                <div class="d-flex my-2 align-center">
+                    <MudTextField @bind-Value="option.Content" Label="متن گزینه" Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-grow-1"/>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="() => _questionModel.Options.Remove(option)" Color="Color.Error"/>
+                </div>
+            }
+
+            <MudButton OnClick="() => _questionModel.Options.Add(new OptionDto())" Variant="Variant.Text" Color="Color.Primary" Class="mt-2">افزودن گزینه</MudButton>
+
+            <MudText Typo="Typo.h6" Class="mt-4">انتخاب پاسخ صحیح</MudText>
+            <MudRadioGroup T="string" @bind-Value="_selectedCorrectAnswerContent">
+                @foreach (var option in _questionModel.Options)
+                {
+                    <MudRadio T="string" Value="@option.Content">@option.Content</MudRadio>
+                }
+            </MudRadioGroup>
+        }
+        else
+        {
+            <MudTextField Label="پاسخ صحیح" @bind-Value="_questionModel.CorrectAnswer" Variant="Variant.Outlined" Class="mt-4"/>
+        }
+
+        <div class="d-flex justify-space-between mt-6">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="HandleUpdateQuestion">ذخیره تغییرات</MudButton>
+            <MudButton Href="/admin/manage-questions?tab=list" Variant="Variant.Outlined">بازگشت</MudButton>
+        </div>
+        </div>
+    </MudPaper>
+}
+
+@code {
+    [Parameter]
+    public Guid QuestionId { get; set; }
+
+    private UpdateQuestionCommand? _questionModel;
+    private List<LevelDto>? _levels;
+    private string _selectedCorrectAnswerContent = "";
+    private IBrowserFile? _selectedFile;
+    private string? _previewImageUrl;
+    private const string ApiBaseUrl = "https://localhost:7210";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _questionModel = await Http.GetFromJsonAsync<UpdateQuestionCommand>($"api/Questions/{QuestionId}");
+        _levels = await Http.GetFromJsonAsync<List<LevelDto>>("api/Levels");
+        
+        if (!string.IsNullOrEmpty(_questionModel?.ImageUrl))
+        {
+            _previewImageUrl = ApiBaseUrl + _questionModel.ImageUrl;
+        }
+        
+        if (_questionModel?.Type == QuestionType.MultipleChoice)
+        {
+            _selectedCorrectAnswerContent = _questionModel.Options.FirstOrDefault(o => o.IsCorrect)?.Content ?? "";
+        }
+    }
+    
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        _selectedFile = e.File;
+        if (_selectedFile != null)
+        {
+            var stream = _selectedFile.OpenReadStream(long.MaxValue);
+            var buffer = new byte[_selectedFile.Size];
+            stream.Read(buffer, 0, buffer.Length);
+            var imageBase64 = Convert.ToBase64String(buffer);
+            _previewImageUrl = $"data:{_selectedFile.ContentType};base64,{imageBase64}";
+            StateHasChanged();
+        }
+    }
+    
+    private async Task HandleUpdateQuestion()
+    {
+        if (_questionModel == null) return;
+
+        if (_selectedFile != null)
+        {
+            using var content = new MultipartFormDataContent();
+            using var fileContent = new StreamContent(_selectedFile.OpenReadStream(long.MaxValue));
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(_selectedFile.ContentType);
+            content.Add(content: fileContent, name: "file", fileName: _selectedFile.Name);
+            
+            var uploadResponse = await Http.PostAsync("api/FileUpload", content);
+            if (uploadResponse.IsSuccessStatusCode)
+            {
+                var result = await uploadResponse.Content.ReadFromJsonAsync<Profile.UploadResult>();
+                _questionModel.ImageUrl = result?.Url;
+            }
+            else
+            {
+                Snackbar.Add("خطا در آپلود عکس جدید.", Severity.Error);
+                return;
+            }
+        }
+        
+        if (_questionModel.Type == QuestionType.MultipleChoice)
+        {
+            _questionModel.Options.ForEach(o => o.IsCorrect = (o.Content == _selectedCorrectAnswerContent));
+        }
+        else
+        {
+            _questionModel.Options.Clear();
+            _questionModel.Options.Add(new OptionDto { Content = _questionModel.CorrectAnswer, IsCorrect = true });
+        }
+
+        await Http.PutAsJsonAsync($"api/Questions/{QuestionId}", _questionModel);
+        Snackbar.Add("سوال با موفقیت بروزرسانی شد.", Severity.Success);
+        NavigationManager.NavigateTo("/admin/manage-questions?tab=list");    }
+}

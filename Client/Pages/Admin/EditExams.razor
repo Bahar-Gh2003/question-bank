@@ -1,0 +1,103 @@
+@page "/admin/edit-exam/{ExamId:guid}"
+@attribute [Authorize(Roles = "Admin")]
+@using System.Globalization
+@using Sahred.Admin
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<PageTitle>ویرایش آزمون</PageTitle>
+<MudText Typo="Typo.h4" GutterBottom="true">ویرایش آزمون</MudText>
+
+@if (_updateExamDto == null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-6 mt-4">
+        <div class="mirror-field">
+        <MudTextField Label="عنوان آزمون" @bind-Value="_updateExamDto.Title" Variant="Variant.Outlined"/>
+
+        <MudSelect T="Guid" @bind-Value="_updateExamDto.LevelId" Label="برای سطح" Variant="Variant.Outlined" Class="mt-4">
+            @if (_levels != null)
+            {
+                @foreach (var level in _levels)
+                {
+                    <MudSelectItem Value="@level.Id">@level.Title</MudSelectItem>
+                }
+            }
+        </MudSelect>
+
+        @* <MudText Typo="Typo.h6" Class="mt-4">تاریخ شروع</MudText> *@
+        @* <MudGrid Spacing="2"> *@
+        @*     <MudItem xs="4"><MudNumericField Label="روز" @bind-Value="_jalaliDay" Min="1" Max="31" Variant="Variant.Outlined" /></MudItem> *@
+        @*     <MudItem xs="4"><MudNumericField Label="ماه" @bind-Value="_jalaliMonth" Min="1" Max="12" Variant="Variant.Outlined" /></MudItem> *@
+        @*     <MudItem xs="4"><MudNumericField Label="سال" @bind-Value="_jalaliYear" Min="1403" Variant="Variant.Outlined" /></MudItem> *@
+        @* </MudGrid> *@
+
+        @* <MudTimePicker Label="ساعت شروع" @bind-Time="_selectedTime" Variant="Variant.Outlined" Class="mt-4" /> *@
+        <MudNumericField Label="مدت زمان (دقیقه)" @bind-Value="_updateExamDto.DurationInMinutes" Variant="Variant.Outlined" Class="mt-4" Min="1"/>
+        <MudNumericField Label="حداقل نمره قبولی" @bind-Value="_updateExamDto.PassingScore" Variant="Variant.Outlined" Class="mt-4" Min="0"/>
+
+        <div class="d-flex justify-space-between mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="HandleUpdateExam">ذخیره تغییرات</MudButton>
+            <MudButton Href="/admin/manage-exams?tab=list" Variant="Variant.Outlined">بازگشت</MudButton>
+        </div>
+        </div>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public Guid ExamId { get; set; }
+
+    private UpdateExamDto? _updateExamDto;
+    private List<LevelDto>? _levels;
+    // private TimeSpan? _selectedTime;
+    // private int _jalaliYear;
+    // private int _jalaliMonth;
+    // private int _jalaliDay;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _updateExamDto = await Http.GetFromJsonAsync<UpdateExamDto>($"api/Exams/{ExamId}");
+        _levels = await Http.GetFromJsonAsync<List<LevelDto>>("api/Levels");
+
+        // if (_updateExamDto?.StartTime != null)
+        // {
+        //     var persianCalendar = new PersianCalendar();
+        //     // زمان را به وقت محلی تبدیل می‌کنیم تا با ورودی ادمین هماهنگ باشد
+        //     var localStartTime = _updateExamDto.StartTime.Value;
+        //     _jalaliYear = persianCalendar.GetYear(localStartTime);
+        //     _jalaliMonth = persianCalendar.GetMonth(localStartTime);
+        //     _jalaliDay = persianCalendar.GetDayOfMonth(localStartTime);
+        //     _selectedTime = localStartTime.TimeOfDay;
+        // }
+    }
+
+    private async Task HandleUpdateExam()
+    {
+        if (_updateExamDto == null) return;
+
+        // try
+        // {
+        //     var persianCalendar = new PersianCalendar();
+        //     DateTime gregorianDate = persianCalendar.ToDateTime(_jalaliYear, _jalaliMonth, _jalaliDay, 0, 0, 0, 0);
+        //     if (_selectedTime.HasValue)
+        //     {
+        //         // زمان را بدون تبدیل منطقه زمانی ذخیره می‌کنیم
+        //         _updateExamDto.StartTime = gregorianDate.Date + _selectedTime.Value;
+        //     }
+        // }
+        // catch (Exception)
+        // {
+        //     Snackbar.Add("تاریخ شمسی وارد شده معتبر نیست.", Severity.Error);
+        //     return;
+        // }
+
+        await Http.PutAsJsonAsync($"api/Exams/{ExamId}", _updateExamDto);
+        Snackbar.Add("آزمون با موفقیت بروزرسانی شد.", Severity.Success);
+        NavigationManager.NavigateTo("/admin/manage-exams?tab=list"); // <-- این خط را اصلاح کنید
+    }
+
+}

@@ -1,0 +1,50 @@
+@page "/admin/dashboard"
+@attribute [Authorize(Roles = "Admin")]
+@using Sahred.Admin
+@using Client.Helpers
+@inject HttpClient Http
+
+<PageTitle>داشبورد ادمین</PageTitle>
+
+@* <PageHeader Title="داشبورد مدیریتی" /> *@
+
+@if (_stats == null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudGrid Spacing="3">
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="3" Class="pa-4 d-flex flex-column align-center justify-center" Style="height: 150px;">
+                <MudIcon Icon="@Icons.Material.Filled.People" Color="Color.Primary" Style="font-size: 48px;" />
+                <MudText Typo="Typo.h5" Class="mt-2">@_stats.TotalUsers.ToPersianDigits()</MudText>
+                <MudText Typo="Typo.subtitle1">تعداد کل دانشجویان</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="3" Class="pa-4 d-flex flex-column align-center justify-center" Style="height: 150px;">
+                <MudIcon Icon="@Icons.Material.Filled.QuestionAnswer" Color="Color.Secondary" Style="font-size: 48px;" />
+                <MudText Typo="Typo.h5" Class="mt-2">@_stats.TotalQuestions.ToPersianDigits()</MudText>
+                <MudText Typo="Typo.subtitle1">تعداد کل سوالات</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="3" Class="pa-4 d-flex flex-column align-center justify-center" Style="height: 150px;">
+                <MudIcon Icon="@Icons.Material.Filled.Event" Color="Color.Info" Style="font-size: 48px;" />
+                <MudText Typo="Typo.h5" Class="mt-2">@_stats.TotalExams.ToPersianDigits()</MudText>
+                <MudText Typo="Typo.subtitle1">تعداد کل آزمون‌ها</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+
+@code {
+    private DashboardStatsDto? _stats;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _stats = await Http.GetFromJsonAsync<DashboardStatsDto>("api/admin/stats");
+    }
+}

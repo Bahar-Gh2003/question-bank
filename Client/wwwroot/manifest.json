@@ -1,0 +1,22 @@
+{
+  "name": "سامانه آزمون آنلاین",
+  "short_name": "آزمون آنلاین",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#594AE2",
+  "prefer_related_applications": false,
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "Downloads/icon-512.png",
+      "type": "Downloads/png",
+      "sizes": "512x512"
+    },
+    {
+      "src": "Downloads/icon-192.png",
+      "type": "Downloads/png",
+      "sizes": "192x192"
+    }
+  ]
+}

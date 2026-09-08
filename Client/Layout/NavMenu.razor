@@ -1,0 +1,27 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+<MudNavMenu>
+    @* === لینک صفحه اصلی (برای همه قابل مشاهده) === *@
+    @* <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">صفحه اصلی</MudNavLink> *@
+
+    @* === این بلوک، لینک‌ها را به همه "به جز ادمین" نمایش می‌دهد === *@
+    <AuthorizeView Roles="Admin">
+        <NotAuthorized>
+            @* محتوای این بخش به هر کسی که نقش "ادمین" ندارد، نمایش داده می‌شود 
+               (یعنی کاربران وارد نشده و دانشجویان) *@
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">صفحه اصلی</MudNavLink>
+            <MudNavLink Href="/exams" Icon="@Icons.Material.Filled.Quiz">آزمون‌ها</MudNavLink>
+            <MudNavLink Href="/results" Icon="@Icons.Material.Filled.Assessment">کارنامه</MudNavLink>
+        </NotAuthorized>
+    </AuthorizeView>
+    
+    @* === لینک‌ها فقط برای ادمین === *@
+    <AuthorizeView Roles="Admin">
+        <Authorized>
+            <MudNavLink Href="/admin/dashboard" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">داشبورد</MudNavLink>
+            <MudNavLink Href="/admin/manage-exams" Icon="@Icons.Material.Filled.Event">مدیریت آزمون‌ها</MudNavLink>
+            <MudNavLink Href="/admin/manage-questions" Icon="@Icons.Material.Filled.QuestionAnswer">مدیریت سوالات</MudNavLink>
+            <MudNavLink Href="/admin/view-users" Icon="@Icons.Material.Filled.People">مشاهده کاربران</MudNavLink>
+            
+        </Authorized>
+    </AuthorizeView>
+</MudNavMenu>

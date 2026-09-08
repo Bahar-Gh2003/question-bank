@@ -1,0 +1,25 @@
+﻿@using Client.Layout
+@using Client.Pages
+@using Microsoft.AspNetCore.Components.Authorization
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(App).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                
+                @* --- این بخش مهم فراموش شده بود --- *@
+                <NotAuthorized>
+                    @* اگر کاربر وارد نشده بود، به صفحه لاگین هدایتش کن *@
+                    <RedirectToLogin />
+                </NotAuthorized>
+                
+            </AuthorizeRouteView>
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            <PageTitle>پیدا نشد</PageTitle>
+            <LayoutView Layout="@typeof(MainLayout)">
+                <p role="alert">متاسفانه صفحه‌ای با این آدرس وجود ندارد.</p>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>

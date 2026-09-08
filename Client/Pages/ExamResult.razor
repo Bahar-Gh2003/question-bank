@@ -1,0 +1,44 @@
+@page "/exam-result/{IsPassed:bool}/{TotalScore:int}"
+@attribute [Authorize(Roles = "Student")]
+@inject NavigationManager NavigationManager
+@using Client.Helpers
+
+<PageTitle>نتیجه آزمون</PageTitle>
+
+<MudGrid Justify="Justify.Center" Class="mt-16">
+    <MudItem xs="12" sm="8" md="6">
+        <MudPaper Elevation="3" Class="pa-6">
+            @if (IsPassed)
+            {
+                <MudAlert Severity="Severity.Success" Variant="Variant.Filled" Class="mb-4">تبریک! شما در این آزمون قبول شدید</MudAlert>
+                <MudText Typo="Typo.h5">کارتان عالی بود!</MudText>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Filled" Class="mb-4">متاسفانه شما نمره قبولی را کسب نکردید</MudAlert>
+                <MudText Typo="Typo.h5">بیشتر تلاش کنید!</MudText>
+            }
+
+            <MudText Typo="Typo.h4" Class="my-4">
+                نمره شما: <MudChip T="int" Color="Color.Primary" Size="Size.Large">@(TotalScore.ToPersianDigits())</MudChip>
+            </MudText>
+
+            <div class="d-flex justify-space-between mt-4">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/results" Style="width: 48%;">
+                    مشاهده کارنامه
+                </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/exams" Style="width: 48%;">
+                    بازگشت به لیست آزمون‌ها
+                </MudButton>
+            </div>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter]
+    public bool IsPassed { get; set; }
+
+    [Parameter]
+    public int TotalScore { get; set; }
+}

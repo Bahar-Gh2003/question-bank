@@ -1,0 +1,157 @@
+@page "/results"
+@attribute [Authorize(Roles = "Student")]
+@using System.Globalization
+@using Sahred.Student
+@using Client.Helpers
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<PageTitle>کارنامه</PageTitle>
+<MudText Typo="Typo.h4" GutterBottom="true">سوابق آزمون شما</MudText>
+
+@if (_attempts == null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (!_attempts.Any())
+{
+    <MudAlert Severity="Severity.Info">شما هنوز در هیچ آزمونی شرکت نکرده‌اید.</MudAlert>
+}
+else
+{
+    <MudGrid Spacing="3" Class="mt-4">
+        @foreach (var attempt in _attempts)
+        {
+            <MudItem xs="12" sm="6">
+                <MudCard>
+                    <MudCardContent Class="d-flex flex-column align-center">
+                        <MudText Typo="Typo.h6">@attempt.ExamTitle</MudText>
+                        <MudText Typo="Typo.body2">@attempt.LevelTitle</MudText>
+                        <MudText Typo="Typo.body2">تلاش شماره @(attempt.AttemptNumber.ToPersianDigits()) - تاریخ: @ToPersianDateString(attempt.AttemptedAt)</MudText>
+                    </MudCardContent>
+                    <MudCardActions Class="d-flex justify-center gap-2">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Success" OnClick="@(() => ShowStatus(attempt.AttemptId))">نمایش وضعیت</MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="@($"/exam-review/{attempt.AttemptId}")">مرور پاسخ‌ها</MudButton>
+                    </MudCardActions>
+
+                    @* --- پنل باز شونده برای نمایش جزئیات --- *@
+                    @if (_selectedAttemptId == attempt.AttemptId)
+                    {
+                        <MudDivider />
+                        <MudCardContent>
+                            @if (_selectedAttemptStatus == null)
+                            {
+                                <div class="d-flex justify-center pa-2">
+                                    <MudProgressCircular Indeterminate="true" />
+                                </div>
+                            }
+                            else
+                            {
+                                <MudSimpleTable Dense="true" >
+                                    <tbody>
+                                    <tr>
+                                        <td >نمره شما</td>
+                                        <td ><MudChip T="int" Color="Color.Primary">@(_selectedAttemptStatus.StudentScore.ToPersianDigits()) از @(_selectedAttemptStatus.TotalExamScore.ToPersianDigits())</MudChip></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td>وضعیت</td>
+                                        <td>
+                                            @if (_selectedAttemptStatus.IsPassed) { <MudChip T="string" Color="Color.Success">قبول</MudChip> }
+                                            else { <MudChip T="string" Color="Color.Error">مردود</MudChip> }
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>رتبه شما</td>
+                                        <td><MudChip T="int" Color="Color.Primary">@(_selectedAttemptStatus.Rank.ToPersianDigits()) از @(_selectedAttemptStatus.TotalParticipants.ToPersianDigits())</MudChip></td>
+
+                                        @* <td>@_selectedAttemptStatus.Rank از @_selectedAttemptStatus.TotalParticipants</td> *@
+                                    </tr>
+                                    @* <tr> *@
+                                    @*     <td>تعداد قبول‌شدگان</td> *@
+                                    @*     <td>@_selectedAttemptStatus.PassedCount</td> *@
+                                    @* </tr> *@
+                                    @* <tr> *@
+                                    @*     <td>تعداد مردودین</td> *@
+                                    @*     <td>@_selectedAttemptStatus.FailedCount</td> *@
+                                    @* </tr> *@
+                                    <tr>
+                                        <td>حداقل نمره قبولی</td>
+                                        <td><MudChip T="int">@(_selectedAttemptStatus.PassingScore.ToPersianDigits())</MudChip></td>
+                                    </tr>
+                                    </tbody>
+                                </MudSimpleTable>
+                                
+                                <MudText Typo="Typo.h6" Class="mt-4" Style="width:100%" TableLayout="TableLayout.Fixed">توزیع نمرات در این آزمون</MudText>
+                                <MudSimpleTable Dense="true" Class="mt-2">
+                                    <thead>
+                                    <tr>
+                                        <th Style="width:50%">نمره</th>
+                                        <th Style="width:20%">تعداد دانشجویان</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    @foreach (var score in _selectedAttemptStatus.ScoreDistribution.OrderByDescending(s => s.Key))
+                                    {
+                                        <tr>
+                                            <td>@(score.Key.ToPersianDigits())</td>
+                                            <td>@(score.Value.ToPersianDigits()) نفر</td>
+                                        </tr>
+                                    }
+                                    </tbody>
+                                </MudSimpleTable>
+                            }
+                        </MudCardContent>
+                    }
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private List<ExamAttemptDto>? _attempts;
+    private AttemptStatusDto? _selectedAttemptStatus;
+    private Guid? _selectedAttemptId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _attempts = await Http.GetFromJsonAsync<List<ExamAttemptDto>>($"api/student/history?cacheBuster={Guid.NewGuid()}");
+    }
+
+    private async Task ShowStatus(Guid attemptId)
+    {
+        if (_selectedAttemptId == attemptId)
+        {
+            _selectedAttemptId = null; // بستن پنل با کلیک مجدد
+            _selectedAttemptStatus = null;
+            return;
+        }
+
+        _selectedAttemptId = attemptId;
+        _selectedAttemptStatus = null; // نمایش حالت لودینگ
+        StateHasChanged();
+        
+        try
+        {
+            _selectedAttemptStatus = await Http.GetFromJsonAsync<AttemptStatusDto>($"api/student/attempt-status/{attemptId}");
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("خطا در بارگذاری جزئیات وضعیت.", Severity.Error);
+            _selectedAttemptId = null;
+        }
+        StateHasChanged();
+    }
+    
+    private string ToPersianDateString(DateTime utcDateTime)
+    {
+        var localDateTime = utcDateTime.ToLocalTime();
+        var persianCalendar = new PersianCalendar();
+        var year = persianCalendar.GetYear(localDateTime);
+        var month = persianCalendar.GetMonth(localDateTime).ToString("00");
+        var day = persianCalendar.GetDayOfMonth(localDateTime).ToString("00");
+        return $"{year}/{month}/{day}".ToPersianDigits();
+    }
+}

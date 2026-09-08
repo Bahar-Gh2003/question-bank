@@ -1,0 +1,182 @@
+@page "/admin/manage-exams"
+@attribute [Authorize(Roles = "Admin")]
+@using System.Globalization
+@using Client.Helpers
+@using Sahred.Admin
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+<PageTitle>مدیریت آزمون‌ها</PageTitle>
+
+<div class="mirror-field">
+<MudTabs RightToLeft="true" PanelClass="pa-6" @bind-ActivePanelIndex="_activeTabIndex">
+    <MudTabPanel Text="تعریف آزمون جدید">
+        <div class="">
+        <MudPaper Class="pa-4">
+            <MudTextField Label="عنوان آزمون" @bind-Value="_createExamDto.Title" Variant="Variant.Outlined"/>
+
+            <MudSelect T="Guid?" @bind-Value="_createExamDto.LevelId" Label=" سطح آزمون" Variant="Variant.Outlined" Class="mt-4">
+                @if (_levels != null)
+                {
+                    @foreach (var level in _levels)
+                    {
+                        <MudSelectItem T="Guid?" Value="@level.Id">@level.Title</MudSelectItem>
+                    }
+                }
+            </MudSelect>
+
+            @* <MudText Typo="Typo.h6" Class="mt-4">تاریخ شروع</MudText> *@
+            @* <MudGrid Spacing="2"> *@
+            @*     <MudItem xs="4"><MudNumericField Label="روز" @bind-Value="_jalaliDay" Min="1" Max="31" Variant="Variant.Outlined" /></MudItem> *@
+            @*     <MudItem xs="4"><MudNumericField Label="ماه" @bind-Value="_jalaliMonth" Min="1" Max="12" Variant="Variant.Outlined" /></MudItem> *@
+            @*     <MudItem xs="4"><MudNumericField Label="سال" @bind-Value="_jalaliYear" Min="1403" Variant="Variant.Outlined" /></MudItem> *@
+            @* </MudGrid> *@
+
+            @* <MudTimePicker Label="ساعت شروع" @bind-Time="_selectedTime" Variant="Variant.Outlined" Class="mt-4" /> *@
+            <MudNumericField Label="مدت زمان (دقیقه)" @bind-Value="_createExamDto.DurationInMinutes" Variant="Variant.Outlined" Class="mt-4"/>
+            <MudNumericField Label="حداقل نمره قبولی" @bind-Value="_createExamDto.PassingScore" Variant="Variant.Outlined" Class="mt-4"/>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-4" OnClick="HandleCreateExam">ایجاد آزمون</MudButton>
+        </MudPaper>
+        </div>
+    </MudTabPanel>
+    <MudTabPanel Text="لیست آزمون‌های تعریف شده">
+        <div class="mirror-field">
+        @if (_allExams == null)
+        {
+            <MudProgressCircular Indeterminate="true"/>
+        }
+        else
+        {
+            <MudTable Items="@_allExams" Hover="true" Striped="true"
+                      Style="width:100%" TableLayout="TableLayout.Fixed">
+                <HeaderContent>
+                    <MudTh Style="width:25%">عنوان آزمون</MudTh>
+                    <MudTh Style="width:25%">سطح</MudTh>
+                    @* <MudTh>زمان شروع</MudTh> *@
+                    <MudTh Style="width:25%">مدت</MudTh>
+                    <MudTh Style="width:25%">عملیات</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="عنوان">@context.Title</MudTd>
+                    <MudTd DataLabel="سطح">@context.LevelTitle</MudTd>
+                    @* <MudTd DataLabel="زمان شروع">@ToPersianDateTimeString(context.StartTime)</MudTd> *@
+                    <MudTd DataLabel="مدت">@context.DurationInMinutes.ToPersianDigits() دقیقه </MudTd>
+                    <MudTd DataLabel="عملیات">
+                        <MudTooltip Text="مشاهده نتایج">
+                            <MudIconButton Href="@($"/admin/exam-results/{context.Id}")" Icon="@Icons.Material.Filled.Leaderboard" Color="Color.Info" Size="Size.Small"/>
+                        </MudTooltip>
+                        <MudTooltip Text="ویرایش آزمون">
+                            <MudIconButton Href="@($"/admin/edit-exam/{context.Id}")" Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small" Class="ml-2"/>
+                        </MudTooltip>
+                        <MudTooltip Text="حذف آزمون">
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => ConfirmDelete(context.Id, context.Title))" Class="ml-2"/>
+                        </MudTooltip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+        </div>
+    </MudTabPanel>
+</MudTabs>
+
+</div>
+
+@code {
+    private CreateExamDto _createExamDto = new();
+    private List<LevelDto>? _levels;
+    // private TimeSpan? _selectedTime = DateTime.Now.TimeOfDay;
+    // private int _jalaliYear = 1404;
+    // private int _jalaliMonth = 1;
+    // private int _jalaliDay = 1;
+    [Parameter, SupplyParameterFromQuery]
+    public string? Tab { get; set; }
+
+    private int _activeTabIndex = 0;
+    
+    private List<AdminExamListDto>? _allExams;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Tab?.ToLower() == "list")
+        {
+            _activeTabIndex = 1; // به تب "لیست آزمون‌ها" برو
+        }
+        await Task.WhenAll(LoadLevels(), LoadAllExams());
+    }
+
+    private async Task LoadLevels()
+    {
+        _levels = await Http.GetFromJsonAsync<List<LevelDto>>("api/Levels");
+    }
+
+    private async Task LoadAllExams()
+    {
+        _allExams = await Http.GetFromJsonAsync<List<AdminExamListDto>>($"api/Exams?cacheBuster={Guid.NewGuid()}");
+        StateHasChanged();
+    }
+
+    // private string ToPersianDateTimeString(DateTime gregorianDate)
+    // {
+    //     var persianCalendar = new PersianCalendar();
+    //     var year = persianCalendar.GetYear(gregorianDate);
+    //     var month = persianCalendar.GetMonth(gregorianDate).ToString("00");
+    //     var day = persianCalendar.GetDayOfMonth(gregorianDate).ToString("00");
+    //     var time = gregorianDate.ToString("HH:mm");
+    //     return $"{time} - {year}/{month}/{day}";
+    // }
+    
+    private async Task ConfirmDelete(Guid examId, string title)
+    {
+        var result = await DialogService.ShowMessageBox("تایید حذف", $"آیا از حذف آزمون «{title}» مطمئن هستید؟", yesText: "حذف", cancelText: "لغو");
+        if (result == true)
+        {
+            var response = await Http.DeleteAsync($"api/Exams/{examId}");
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("آزمون با موفقیت حذف شد.", Severity.Success);
+                await LoadAllExams();
+            }
+            else
+            {
+                // خواندن و نمایش پیام خطای مشخص از API
+                var errorMessage = await response.Content.ReadAsStringAsync();
+                Snackbar.Add(errorMessage, Severity.Error);
+            }
+        }
+    }
+
+    private async Task HandleCreateExam()
+    {
+        if (!_createExamDto.LevelId.HasValue)
+        {
+            Snackbar.Add("لطفاً سطح آزمون را انتخاب کنید.", Severity.Warning);
+            return;
+        }
+        
+        // try
+        // {
+            // var persianCalendar = new PersianCalendar();
+            // DateTime gregorianDate = persianCalendar.ToDateTime(_jalaliYear, _jalaliMonth, _jalaliDay, 0, 0, 0, 0);
+            // _createExamDto.StartTime = gregorianDate.Date + (_selectedTime ?? TimeSpan.Zero);
+        // }
+        // catch (ArgumentOutOfRangeException)
+        // {
+            // Snackbar.Add("تاریخ شمسی وارد شده معتبر نیست.", Severity.Error);
+            // return;
+        // }
+
+        var response = await Http.PostAsJsonAsync("api/Exams", _createExamDto);
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add("آزمون با موفقیت ایجاد شد.", Severity.Success);
+            _createExamDto = new();
+            await LoadAllExams();
+        }
+        else
+        {
+            Snackbar.Add("خطا در ایجاد آزمون.", Severity.Error);
+        }
+    }
+}

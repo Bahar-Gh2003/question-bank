@@ -1,0 +1,77 @@
+@page "/exam-review/{AttemptId:guid}"
+@attribute [Authorize(Roles = "Student")]
+@using Domain
+@using Sahred.Student
+@using Client.Helpers
+
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<PageTitle>مرور آزمون</PageTitle>
+
+@if (_reviewData == null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <div class="d-flex justify-space-between align-center mb-4">
+        <MudText Typo="Typo.h4" GutterBottom="true">مرور آزمون: @_reviewData.ExamTitle</MudText>
+    </div>
+
+    @foreach (var (question, index) in _reviewData.Questions.Select((q, i) => (q, i)))
+    {
+        <MudPaper Class="pa-4 my-4">
+            <MudText Typo="Typo.h6"><b>سوال @((index + 1).ToPersianDigits()) (@(question.Score.ToPersianDigits()) نمره)</b></MudText>
+            @if (!string.IsNullOrEmpty(question.ImageUrl))
+            {
+                <div class="d-flex justify-center mb-4">
+                    <img src="@(ApiBaseUrl + question.ImageUrl + "?t=" + DateTime.Now.Ticks)" style="max-height: 200px; max-width: 100%;" />
+                </div>
+            }
+            <MudText>@question.Content</MudText>
+            
+         
+            @if (question.Type == QuestionType.MultipleChoice)
+            {
+                @if(question.IsStudentAnswerCorrect)
+              {
+                <MudAlert Severity="Severity.Success" Class="mt-2"><b>پاسخ شما:</b> @question.StudentAnswer</MudAlert>
+               }
+                else
+              {
+                <MudAlert Severity="Severity.Error" Class="mt-2"><b>پاسخ شما:</b> @question.StudentAnswer</MudAlert>
+                @* <MudAlert Severity="Severity.Info" Class="mt-2"><b>پاسخ صحیح:</b> @question.CorrectAnswer</MudAlert> *@
+              }
+                <MudRadioGroup T="Guid?" ReadOnly="true" Value="@question.SelectedOptionId" Class="mt-2">
+                    @foreach (var option in question.Options)
+                    {
+                        <MudRadio T="Guid?" Option="@option.Id" ReadOnly="true"   Color="@(option.IsCorrect ? Color.Success : Color.Default)">
+                            @option.Content
+                        </MudRadio>
+                        
+                    }
+                </MudRadioGroup>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info" Class="mt-2">این سوال پس از تصحیح توسط ادمین، نمره‌دهی خواهد شد.</MudAlert>
+                <MudAlert Severity="Severity.Normal" Class="mt-2"><b>پاسخ شما:</b> @question.StudentAnswer</MudAlert>
+            }
+            
+        </MudPaper>
+    }
+    <MudButton Variant="Variant.Outlined" OnClick="@(() => NavigationManager.NavigateTo("/results"))">بازگشت به کارنامه</MudButton>
+}
+
+@code {
+    [Parameter]
+    public Guid AttemptId { get; set; }
+    private ExamReviewDto? _reviewData;
+    private const string ApiBaseUrl = "https://localhost:7210";
+    
+    protected override async Task OnInitializedAsync()
+    {
+        _reviewData = await Http.GetFromJsonAsync<ExamReviewDto>($"api/student/review/{AttemptId}");
+    }
+}

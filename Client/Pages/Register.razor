@@ -1,0 +1,133 @@
+@page "/register"
+@using Domain
+@using Sahred
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<MudGrid Justify="Justify.Center" Class="mt-16">
+    <MudItem xs="12" sm="8" md="4">
+        <EditForm Model="@_userForRegistration" OnValidSubmit="HandleRegistration">
+        <DataAnnotationsValidator />
+        <MudCard Elevation="25">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h5" Align="Align.Center">ثبت‌نام در سامانه</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <div class="mirror-field">
+                <MudTextField @bind-Value="_userForRegistration.FullName"
+                              For="@(() => _userForRegistration.FullName)"
+                              Label="نام کامل" Variant="Variant.Outlined" Class="my-4"/>
+                <MudTextField @bind-Value="_userForRegistration.Username" Label="نام کاربری" Variant="Variant.Outlined" Class="my-4"/>
+                <MudTextField @bind-Value="_userForRegistration.PhoneNumber" For="@(() => _userForRegistration.PhoneNumber)" Label="شماره موبایل"  Variant="Variant.Outlined" Class="my-4"/>
+                <MudTextField @bind-Value="_userForRegistration.Email" Label="ایمیل" Variant="Variant.Outlined" Class="my-4"/>
+
+                <MudText Typo="Typo.subtitle1" Class="mt-3">تاریخ تولد</MudText>
+                <MudGrid>
+                    <MudItem xs="4">
+                        <MudNumericField @bind-Value="_userForRegistration.BirthDay" Label="روز" Variant="Variant.Outlined" Min="1" Max="31"/>
+                    </MudItem>
+                    <MudItem xs="4">
+                        <MudNumericField @bind-Value="_userForRegistration.BirthMonth" Label="ماه" Variant="Variant.Outlined" Min="1" Max="12"/>
+                    </MudItem>
+                    <MudItem xs="4">
+                        <MudNumericField @bind-Value="_userForRegistration.BirthYear" Label="سال" Variant="Variant.Outlined" Min="1300" Max="1403"/>
+                    </MudItem>
+                </MudGrid>
+
+                <MudSelect T="Gender?" @bind-Value="_userForRegistration.Gender" For="@(() => _userForRegistration.Gender)" Label="جنسیت" Variant="Variant.Outlined" Class="my-3">
+                    <MudSelectItem T="Gender?" Value="Gender.Male">مرد</MudSelectItem>
+                    <MudSelectItem T="Gender?" Value="Gender.Female">زن</MudSelectItem>
+                </MudSelect>
+
+                <MudTextField @bind-Value="_userForRegistration.Password" Label="رمز عبور" InputType="InputType.Password" Variant="Variant.Outlined" Class="my-4"/>
+                <div class="recaptcha-google-style mt-3" @onclick="HandleCaptchaClick">
+                    <div class="recaptcha-checkbox">
+                        <span class="recaptcha-box">
+                            @if (_isLoadingCaptcha)
+                            {
+                                <div class="recaptcha-spinner"></div>
+                            }
+                            else if (_isHumanVerified)
+                            {
+                                <svg viewBox="0 0 24 24" width="18" height="18">
+                                    <path fill="none" stroke="#34a853" stroke-width="3" d="M4 12l6 6L20 6"/>
+                                </svg>
+                            }
+                        </span>
+                        <span class="recaptcha-label">من ربات نیستم</span>
+                    </div>
+                    <div class="recaptcha-logo">
+                    </div>
+                </div>
+                </div>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Disabled="@_isProcessing">
+                    @if (_isProcessing)
+                    {
+                        <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true"/>
+                        <MudText Class="ms-2">در حال ثبت‌نام...</MudText>
+                    }
+                    else
+                    {
+                        <MudText>ایجاد حساب کاربری</MudText>
+                    }
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+        </EditForm>
+        <MudText Align="Align.Center" Class="mt-4">
+            قبلاً ثبت‌نام کرده‌اید؟ <MudLink Href="/login">وارد شوید</MudLink>
+        </MudText>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private readonly UserForRegistrationDto _userForRegistration = new();
+    private bool _isProcessing = false;
+    private bool _isLoadingCaptcha = false;
+    private bool _isHumanVerified = false;
+    private string? _captchaToken;
+    
+    private async Task HandleCaptchaClick()
+    {
+        if (_isLoadingCaptcha || _isHumanVerified) return;
+        _isLoadingCaptcha = true;
+        StateHasChanged();
+
+        // شبیه‌سازی فراخوانی سرویس کپچا
+        await Task.Delay(1500);
+        _captchaToken = Guid.NewGuid().ToString("N"); 
+        _isHumanVerified = true;
+        _isLoadingCaptcha = false;
+
+        StateHasChanged();
+    }
+
+
+    private async Task HandleRegistration()
+    {
+        _isProcessing = true;
+        if (!_isHumanVerified)
+        {
+            Snackbar.Add("لطفاً تأیید کنید که ربات نیستید.", Severity.Warning);
+            return;
+        }
+        var response = await Http.PostAsJsonAsync("api/auth/register", _userForRegistration);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add("ثبت‌نام شما با موفقیت انجام شد. لطفاً وارد شوید.", Severity.Success);
+            NavigationManager.NavigateTo("/login");
+        }
+        else
+        {
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            Snackbar.Add(errorMessage, Severity.Error);
+            _isProcessing = false;
+        }
+    }
+}

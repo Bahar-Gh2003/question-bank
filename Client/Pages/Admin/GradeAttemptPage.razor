@@ -1,0 +1,122 @@
+@page "/admin/grade-attempt/{AttemptId:guid}"
+@attribute [Authorize(Roles = "Admin")]
+@using Domain
+@using Sahred.Admin
+@using Client.Helpers
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<PageTitle>تصحیح آزمون</PageTitle>
+
+<div class="d-flex justify-space-between align-center">
+    <MudText Typo="Typo.h4" GutterBottom="true">برگه تصحیح ازمون</MudText>
+</div>
+@if (_gradingData == null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    foreach (var item in _gradingData)
+    {
+        <MudCard Class="my-4">
+            <MudCardContent>
+                <MudText Typo="Typo.h6">سوال (@item.Score.ToPersianDigits() نمره):</MudText>
+                @if (!string.IsNullOrEmpty(item.ImageUrl))
+                {
+                    <div class="d-flex justify-center my-4">
+                        <img src="@(ApiBaseUrl + item.ImageUrl + "?t=" + DateTime.Now.Ticks)" style="max-height: 200px; max-width: 100%;" />
+                    </div>
+                }
+                <MudText>@item.Content</MudText>
+                <hr class="my-2"/>
+                <MudText><b>پاسخ صحیح:</b> @item.CorrectAnswer</MudText>
+                <MudText><b>پاسخ دانشجو:</b> @item.StudentAnswer</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                @if (item.Type == QuestionType.MultipleChoice)
+                {
+          
+                    @if (item.IsCorrect == true)
+                    {
+                        <MudChip T="string" Icon="@Icons.Material.Filled.Check" Color="Color.Success">صحیح </MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Icon="@Icons.Material.Filled.Close" Color="Color.Error">غلط </MudChip>
+                    }
+                    
+                }
+                else // سوال تشریحی
+                {
+                    <MudText>تصحیح دستی:</MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Color="@GetGradeButtonColor(item.QuestionId, true)" OnClick="@(() => GradeAnswer(item.QuestionId, true))">صحیح</MudIconButton>
+                    <MudIconButton Icon="@Icons.Material.Filled.Cancel" Color="@GetGradeButtonColor(item.QuestionId, false)" OnClick="@(() => GradeAnswer(item.QuestionId, false))">غلط</MudIconButton>
+                }
+            </MudCardActions>
+        </MudCard>
+    }
+
+    <div class="d-flex justify-space-between mt-4">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" Class="mt-4" OnClick="HandleSubmitGrades" >ثبت نهایی نمرات</MudButton>
+        <MudButton Variant="Variant.Outlined" Href="/admin/manage-exams?tab=list">بازگشت به لیست آزمون‌ها</MudButton>    </div>
+}
+
+
+@code {
+    [Parameter]
+    public Guid AttemptId { get; set; }
+
+    private List<GradingQuestionDto>? _gradingData;
+    private Dictionary<Guid, bool> _gradedAnswers = new();
+    private bool _isSaving = false;
+    private const string ApiBaseUrl = "https://localhost:7210";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _gradingData = await Http.GetFromJsonAsync<List<GradingQuestionDto>>($"api/grading/{AttemptId}");
+        if (_gradingData != null)
+        {
+            // Pre-fill the grades from the loaded data
+            foreach (var question in _gradingData.Where(q => q.Type == QuestionType.ShortAnswer && q.IsCorrect.HasValue))
+            {
+                _gradedAnswers[question.QuestionId] = question.IsCorrect.Value;
+            }
+        }
+       
+    }
+
+    private void GradeAnswer(Guid questionId, bool isCorrect)
+    {
+        _gradedAnswers[questionId] = isCorrect;
+    }
+
+    private Color GetGradeButtonColor(Guid questionId, bool expectedState)
+    {
+        if (_gradedAnswers.TryGetValue(questionId, out var currentState) && currentState == expectedState)
+        {
+            return expectedState ? Color.Success : Color.Error;
+        }
+        return Color.Default;
+    }
+
+    private async Task HandleSubmitGrades()
+    {
+        _isSaving = true;
+        var submission = new GradingSubmissionDto { GradedAnswers = _gradedAnswers };
+        var response = await Http.PostAsJsonAsync($"api/grading/{AttemptId}", submission);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add("نمرات با موفقیت ثبت شد و نمره دانشجو بروزرسانی گردید.", Severity.Success);
+            NavigationManager.NavigateTo($"/admin/manage-exams?tab=list");
+            // NavigationManager.NavigateTo($"api/grading/exam-results/{ExamId}");
+        }
+        else
+        {
+            Snackbar.Add("خطا در ثبت نمرات.", Severity.Error);
+        }
+        _isSaving = false;
+    }
+}

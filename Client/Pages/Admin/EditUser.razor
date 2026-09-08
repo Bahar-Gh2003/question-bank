@@ -1,0 +1,61 @@
+@page "/admin/edit-user/{UserId:guid}"
+@attribute [Authorize(Roles = "Admin")]
+@using Domain
+@using Sahred.Admin
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<PageTitle>ویرایش کاربر</PageTitle>
+<MudText Typo="Typo.h4" GutterBottom="true">ویرایش کاربران</MudText>
+@if (_userDto == null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-6 mt-4">
+        <div class="mirror-field">
+        <MudTextField @bind-Value="_userDto.FullName" Label="نام کامل" Variant="Variant.Outlined" Class="my-3"/>
+        <MudTextField @bind-Value="_userDto.Username" Label="نام کاربری" Variant="Variant.Outlined" Class="my-3"/>
+        <MudTextField @bind-Value="_userDto.PhoneNumber" Label="شماره موبایل" Variant="Variant.Outlined" Class="my-3"/>
+
+        <MudText Typo="Typo.subtitle1" Class="mt-3">تاریخ تولد</MudText>
+        <MudGrid>
+            <MudItem xs="4"><MudNumericField @bind-Value="_userDto.BirthDay" Label="روز" Variant="Variant.Outlined"/></MudItem>
+            <MudItem xs="4"><MudNumericField @bind-Value="_userDto.BirthMonth" Label="ماه" Variant="Variant.Outlined"/></MudItem>
+            <MudItem xs="4"><MudNumericField @bind-Value="_userDto.BirthYear" Label="سال" Variant="Variant.Outlined"/></MudItem>
+        </MudGrid>
+
+        <MudSelect T="Gender?" @bind-Value="_userDto.Gender" Label="جنسیت" Variant="Variant.Outlined" Class="my-3">
+            <MudSelectItem T="Gender?" Value="Gender.Male">مرد</MudSelectItem>
+            <MudSelectItem T="Gender?" Value="Gender.Female">زن</MudSelectItem>
+        </MudSelect>
+
+        <div class="d-flex justify-space-between mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="HandleUpdateUser">ذخیره تغییرات</MudButton>
+            <MudButton Href="/admin/view-users" Variant="Variant.Outlined">بازگشت</MudButton>
+        </div>
+        </div>
+    </MudPaper>
+}
+
+@code {
+    [Parameter]
+    public Guid UserId { get; set; }
+
+    private AdminUpdateUserDto? _userDto;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _userDto = await Http.GetFromJsonAsync<AdminUpdateUserDto>($"api/Users/{UserId}");
+    }
+
+    private async Task HandleUpdateUser()
+    {
+        if (_userDto == null) return;
+        await Http.PutAsJsonAsync($"api/Users/{UserId}", _userDto);
+        Snackbar.Add("اطلاعات کاربر با موفقیت بروزرسانی شد.", Severity.Success);
+        NavigationManager.NavigateTo("/admin/view-users");
+    }
+}

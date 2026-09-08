@@ -1,0 +1,107 @@
+@page "/admin/view-users"
+@attribute [Authorize(Roles = "Admin")]
+@using Client.Helpers
+@using Domain
+@using Microsoft.AspNetCore.Authorization
+@using Sahred.Admin
+@inject HttpClient Http
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>مشاهده کاربران</PageTitle>
+<MudText Typo="Typo.h4" GutterBottom="true">لیست کاربران </MudText>
+
+@if (_users == null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="@_users" Hover="true" Striped="true" Class="mt-4">
+        <HeaderContent>
+            <MudTh>نام کامل</MudTh>
+            <MudTh>نام کاربری</MudTh>
+            <MudTh>موبایل</MudTh>
+            <MudTh>ایمیل</MudTh>
+            <MudTh>تاریخ تولد</MudTh>
+            <MudTh>جنسیت</MudTh>
+            <MudTh>سطح فعلی</MudTh>
+            <MudTh>عملیات</MudTh> @* <-- ستون جدید *@
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="نام کامل">@context.FullName</MudTd>
+            <MudTd DataLabel="نام کاربری">@context.Username</MudTd>
+            <MudTd DataLabel="موبایل">@context.PhoneNumber</MudTd>
+            <MudTd DataLabel="ایمیل">@context.Email</MudTd>
+            <MudTd DataLabel="تاریخ تولد">@ToPersianDateString(context.DateOfBirth)</MudTd>
+            <MudTd DataLabel="جنسیت">@(context.Gender == Gender.Male ? "مرد" : "زن")</MudTd>
+            <MudTd DataLabel="سطح فعلی">@context.CurrentLevel</MudTd>
+            <MudTd DataLabel="عملیات">
+                <MudTooltip Text="ویرایش">
+                    <MudIconButton Href="@($"/admin/edit-user/{context.Id}")" Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small" />
+                </MudTooltip>
+                <MudTooltip Text="حذف">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"  Color="Color.Error" Size="Size.Small" OnClick="@(() => ConfirmDelete(context.Id, context.FullName))"/>
+                </MudTooltip>
+            </MudTd>
+        </RowTemplate>
+        @* <NoRecordsContent> *@
+        @*     <MudText>کاربری یافت نشد.</MudText> *@
+        @* </NoRecordsContent> *@
+    </MudTable>
+}
+
+@code {
+    private List<UserDto>? _users;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            _users = await Http.GetFromJsonAsync<List<UserDto>>($"api/Users");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطا در بارگذاری کاربران: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ConfirmDelete(Guid userId, string fullName)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "تایید حذف", 
+            $"آیا از حذف کاربر «{fullName}» مطمئن هستید؟", 
+            yesText: "حذف ", 
+            cancelText: "لغو"
+        );
+
+        if (result == true)
+        {
+            var response = await Http.DeleteAsync($"api/Users/{userId}");
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("کاربر با موفقیت حذف شد.", Severity.Success);
+                await LoadUsers(); // حالا، داده‌های تازه را بارگذاری می‌کنیم
+            }
+            else
+            {
+                Snackbar.Add("خطا در حذف کاربر.", Severity.Error);
+            }
+        }
+    }
+    private string ToPersianDateString(DateTime? gregorianDate)
+    {
+        if (!gregorianDate.HasValue)
+            return "";
+        
+        var persianCalendar = new PersianCalendar();
+        var date = gregorianDate.Value;
+        return $"{persianCalendar.GetYear(date)}/{persianCalendar.GetMonth(date):00}/{persianCalendar.GetDayOfMonth(date):00}".ToPersianDigits();
+    }
+}

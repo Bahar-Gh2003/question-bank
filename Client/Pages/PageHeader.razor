@@ -1,0 +1,12 @@
+@using MudBlazor
+
+<MudPaper Class="pa-4 mb-4 rounded-lg" Elevation="3" Style="background: linear-gradient(to right, var(--mud-palette-primary), var(--mud-palette-primary-lighten));">
+    <MudText Typo="Typo.h4" Style="color: white; font-weight: 500;">
+        @Title
+    </MudText>
+</MudPaper>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = "عنوان صفحه";
+}

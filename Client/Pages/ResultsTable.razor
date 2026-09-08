@@ -1,0 +1,61 @@
+@using Sahred
+@using Client.Helpers
+
+@if (Results == null || !Results.Any())
+{
+    <MudAlert Severity="Severity.Info">هنوز هیچ شرکت‌کننده‌ای برای این مرحله ثبت نشده است.</MudAlert>
+}
+else
+{
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="3" Class="pa-4 d-flex flex-column align-center justify-center">
+                <MudIcon Icon="@Icons.Material.Filled.Groups" Color="Color.Primary" Style="font-size: 42px;" />
+                <MudText Typo="Typo.h5" Class="mt-2">@Results.Count.ToPersianDigits()</MudText>
+                <MudText Typo="Typo.subtitle1">تعداد کل شرکت‌کنندگان</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="3" Class="pa-4 d-flex flex-column align-center justify-center">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Style="font-size: 42px;" />
+                <MudText Typo="Typo.h5" Class="mt-2">@Results.Count(r => r.IsPassed).ToPersianDigits()</MudText>
+                <MudText Typo="Typo.subtitle1">تعداد قبول‌شدگان</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="3" Class="pa-4 d-flex flex-column align-center justify-center">
+                <MudIcon Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" Style="font-size: 42px;" />
+                <MudText Typo="Typo.h5" Class="mt-2">@Results.Count(r => !r.IsPassed).ToPersianDigits()</MudText>
+                <MudText Typo="Typo.subtitle1">تعداد مردودشدگان</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+    <MudTable Items="Results" Hover="true" Striped="true">
+        <HeaderContent>
+            <MudTh>رتبه</MudTh>
+            <MudTh>نام دانشجو</MudTh>
+            @* <MudTh>نام کاربری</MudTh> *@
+            <MudTh>نمره</MudTh>
+            <MudTh>وضعیت</MudTh>
+            <MudTh>عملیات</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="رتبه"><MudChip T="int" Color="Color.Primary">@context.Rank.ToPersianDigits()</MudChip></MudTd>
+            <MudTd DataLabel="نام دانشجو">@context.FullName</MudTd>
+            @* <MudTd DataLabel="نام کاربری">@context.Username</MudTd> *@
+            <MudTd DataLabel="نمره">@context.Score.ToPersianDigits()</MudTd>
+            <MudTd DataLabel="وضعیت">
+                @if (context.IsPassed) { <MudChip T="string" Color="Color.Success">قبول</MudChip> }
+                else { <MudChip T="string" Color="Color.Error">مردود</MudChip> }
+            </MudTd>
+            <MudTd DataLabel="عملیات">
+                <MudIconButton Href="@($"/admin/grade-attempt/{context.AttemptId}")" Icon="@Icons.Material.Filled.Grading" Color="Color.Warning" Size="Size.Small" />
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    [Parameter]
+    public List<ExamResultRankDto> Results { get; set; }
+}

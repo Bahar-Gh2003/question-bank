@@ -1,0 +1,206 @@
+@page "/admin/manage-questions"
+@attribute [Authorize(Roles = "Admin")]
+@using Domain
+@using Sahred
+@using Sahred.Admin
+@using Sahred.Command
+@using Client.Helpers
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>مدیریت سوالات</PageTitle>
+
+<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" @bind-ActivePanelIndex="_activeTabIndex" dir="rtl">
+<div class="mirror-field">
+    <MudTabPanel Text="افزودن سوال جدید">
+        <MudPaper Class="pa-4">
+            <MudTextField Label="متن سوال" @bind-Value="_createQuestionCommand.Content" Lines="3" Variant="Variant.Outlined" />
+            <div class="mt-4">
+                <InputFile OnChange="HandleFileSelected" accept="image/*" />
+            </div>
+            @if (!string.IsNullOrEmpty(_previewImageUrl))
+            {
+                <MudCard Class="mt-2" Style="width: 200px;">
+                    <MudCardMedia Image="@_previewImageUrl" Height="150" />
+                </MudCard>
+            }
+            <MudSelect T="Guid?" @bind-Value="_createQuestionCommand.LevelId" Label="سطح سوال" Variant="Variant.Outlined" Class="mt-4">
+                @if (_levels != null) { foreach (var level in _levels) { <MudSelectItem T="Guid?" Value="@level.Id">@level.Title</MudSelectItem> } }
+            </MudSelect>
+            <MudNumericField @bind-Value="_createQuestionCommand.Score" Label="نمره" Variant="Variant.Outlined" Class="mt-4"  />
+            <MudSelect T="QuestionType" @bind-Value="_createQuestionCommand.Type" Label="نوع سوال" Variant="Variant.Outlined" Class="mt-4">
+                <MudSelectItem Value="QuestionType.ShortAnswer">تشریحی</MudSelectItem>
+                <MudSelectItem Value="QuestionType.MultipleChoice">تستی</MudSelectItem>
+            </MudSelect>
+
+            @if (_createQuestionCommand.Type == QuestionType.MultipleChoice)
+            {
+                <MudText Typo="Typo.h6" Class="mt-6">گزینه‌ها</MudText>
+                @foreach (var option in _createQuestionCommand.Options)
+                {
+                    <div class="d-flex my-2 align-center">
+                        <MudTextField @bind-Value="option.Content" Label="متن گزینه" Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-grow-1" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="() => _createQuestionCommand.Options.Remove(option)" Color="Color.Error" />
+                    </div>
+                }
+                <MudButton OnClick="() => _createQuestionCommand.Options.Add(new OptionDto())" Variant="Variant.Text" Color="Color.Primary" Class="mt-2">افزودن گزینه</MudButton>
+
+                <MudText Typo="Typo.h6" Class="mt-4">انتخاب پاسخ صحیح</MudText>
+                <MudRadioGroup T="string" @bind-Value="_selectedCorrectAnswerContent">
+                    @foreach (var option in _createQuestionCommand.Options)
+                    {
+                        <MudRadio T="string" Value="@option.Content">@option.Content</MudRadio>
+                    }
+                </MudRadioGroup>
+            }
+            else
+            {
+                <MudTextField Label="پاسخ صحیح" @bind-Value="_createQuestionCommand.CorrectAnswer" Variant="Variant.Outlined" Class="mt-4" />
+            }
+            
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-6" OnClick="HandleSaveQuestion">ذخیره سوال</MudButton>
+        </MudPaper>
+    </MudTabPanel>
+    <MudTabPanel Text="لیست سوالات">
+        @if (_allQuestions == null) { <MudProgressCircular Indeterminate="true" /> }
+        else
+        {
+            <MudTable Items="@_allQuestions" Hover="true" Striped="true" 
+                      Style="width:100%" TableLayout="TableLayout.Fixed">
+                <HeaderContent>
+                    <MudTh Style="width:20%">عکس</MudTh>
+                    <MudTh Style="width:20%">متن سوال</MudTh>
+                    <MudTh Style="width:20%">سطح</MudTh>
+                    <MudTh Style="width:20%">نمره</MudTh>
+                    <MudTh Style="width:20%">عملیات</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="عکس">
+                        @* --- بخش جدید برای نمایش عکس --- *@
+                        @if (!string.IsNullOrEmpty(context.ImageUrl))
+                        {
+                            <img src="@(ApiBaseUrl + context.ImageUrl + "?t=" + DateTime.Now.Ticks)" style="height: 50px; width: 50px; object-fit: cover; border-radius: 4px;" />
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="متن سوال">@context.Content</MudTd>
+                    <MudTd DataLabel="سطح">@context.LevelTitle</MudTd>
+                    <MudTd DataLabel="نمره">@context.Score.ToPersianDigits()</MudTd>
+                    <MudTd DataLabel="عملیات">
+                        <MudTooltip Text="ویرایش">
+                            <MudIconButton Href="@($"/admin/edit-question/{context.Id}")" Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small" />
+                        </MudTooltip>
+                        <MudTooltip Text="حذف">
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => ConfirmDelete(context.Id, context.Content))" />
+                        </MudTooltip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudTabPanel>
+</div>
+</MudTabs>
+
+@code {
+    private List<LevelDto>? _levels;
+    private List<QuestionDto>? _allQuestions;
+    private CreateQuestionCommand _createQuestionCommand = new();
+    private string _selectedCorrectAnswerContent = "";
+    private IBrowserFile? _selectedFile;
+    private string? _previewImageUrl;
+    private const string ApiBaseUrl = "https://localhost:7210";
+    [Parameter, SupplyParameterFromQuery]
+    public string? Tab { get; set; }
+    private int _activeTabIndex = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Tab?.ToLower() == "list")
+        {
+            _activeTabIndex = 1;
+        }
+        await Task.WhenAll(LoadLevels(), LoadAllQuestions());
+
+    }
+    private async Task LoadLevels() => _levels = await Http.GetFromJsonAsync<List<LevelDto>>("api/Levels");
+    private async Task LoadAllQuestions() => _allQuestions = await Http.GetFromJsonAsync<List<QuestionDto>>($"api/Questions?cacheBuster={Guid.NewGuid()}");
+
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        _selectedFile = e.File;
+        if (_selectedFile != null)
+        {
+            var reader = _selectedFile.OpenReadStream(long.MaxValue);
+            var buffer = new byte[_selectedFile.Size];
+            reader.Read(buffer, 0, buffer.Length);
+            var imageBase64 = Convert.ToBase64String(buffer);
+            _previewImageUrl = $"data:{_selectedFile.ContentType};base64,{imageBase64}";
+            StateHasChanged();
+        }
+    }
+    
+    private async Task HandleSaveQuestion()
+    {
+        if (_selectedFile != null)
+        {
+            using var content = new MultipartFormDataContent();
+            using var fileContent = new StreamContent(_selectedFile.OpenReadStream(long.MaxValue));
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(_selectedFile.ContentType);
+            content.Add(content: fileContent, name: "file", fileName: _selectedFile.Name);
+            
+            var uploadResponse = await Http.PostAsync("api/FileUpload", content);
+
+            if (uploadResponse.IsSuccessStatusCode)
+            {
+                var result = await uploadResponse.Content.ReadFromJsonAsync<Profile.UploadResult>();
+                _createQuestionCommand.ImageUrl = result?.Url;
+            }
+            else
+            {
+                Snackbar.Add("خطا در آپلود عکس.", Severity.Error);
+                return;
+            }
+        }
+        
+        if (_createQuestionCommand.Type == QuestionType.MultipleChoice)
+        {
+            _createQuestionCommand.Options.ForEach(o => o.IsCorrect = (o.Content == _selectedCorrectAnswerContent));
+        }
+        else
+        {
+            _createQuestionCommand.Options.Clear();
+            _createQuestionCommand.Options.Add(new OptionDto { Content = _createQuestionCommand.CorrectAnswer, IsCorrect = true });
+        }
+
+        var response = await Http.PostAsJsonAsync("api/Questions", _createQuestionCommand);
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add("سوال با موفقیت ذخیره شد!", Severity.Success);
+            _createQuestionCommand = new();
+            _selectedCorrectAnswerContent = "";
+            await LoadAllQuestions();
+            StateHasChanged();
+        }
+        else { Snackbar.Add("خطا در ذخیره سوال.", Severity.Error); }
+    }
+    
+    private async Task ConfirmDelete(Guid questionId, string content)
+    {
+        var result = await DialogService.ShowMessageBox("تایید حذف", $"آیا از حذف سوال «{content.Substring(0, Math.Min(content.Length, 20))}...» مطمئن هستید؟", yesText: "حذف", cancelText: "لغو");
+        if (result == true)
+        {
+            var response = await Http.DeleteAsync($"api/Questions/{questionId}");
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("سوال با موفقیت حذف شد.", Severity.Success);
+                await LoadAllQuestions();
+            }
+            else
+            {
+                // Snackbar.Add("خطا در حذف سوال.", Severity.Error);
+                string errorMessage = await response.Content.ReadAsStringAsync();
+                Snackbar.Add(errorMessage, Severity.Error);
+            }
+        }
+    }
+    }

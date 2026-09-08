@@ -1,0 +1,46 @@
+@page "/admin/exam-results/{ExamId:guid}"
+@attribute [Authorize(Roles = "Admin")]
+@using Sahred.Admin
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<PageTitle>نتایج آزمون</PageTitle>
+
+<div class="d-flex justify-space-between align-center">
+    <MudText Typo="Typo.h4" GutterBottom="true">نتایج آزمون</MudText>
+    @* <MudButton Variant="Variant.Outlined" Href="/admin/manage-exams?tab=list">بازگشت به لیست آزمون‌ها</MudButton> *@
+    </div>
+
+@if (_results == null)
+{
+    <MudProgressCircular Indeterminate="true" Class="mt-6" />
+}
+else
+{
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+        <MudTabPanel Text="نتایج تلاش اول">
+            <ResultsTable Results="@_results.Attempt1Results" />
+        </MudTabPanel>
+        <MudTabPanel Text="نتایج تلاش دوم">
+            <ResultsTable Results="@_results.Attempt2Results" />
+        </MudTabPanel>
+        <MudTabPanel Text="نتایج تلاش سوم">
+            <ResultsTable Results="@_results.Attempt3Results" />
+        </MudTabPanel>
+    </MudTabs>
+    <div class="d-flex justify-space-between mt-4">
+        <MudButton Variant="Variant.Outlined" Href="/admin/manage-exams?tab=list">بازگشت به لیست آزمون‌ها</MudButton>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid ExamId { get; set; }
+
+    private AdminExamResultsDto? _results;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _results = await Http.GetFromJsonAsync<AdminExamResultsDto>($"api/grading/exam-results/{ExamId}");
+    }
+}
