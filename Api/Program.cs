@@ -19,6 +19,10 @@ builder.Services.AddHttpContextAccessor();
 
 // ۲. دیتابیس
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+    throw new InvalidOperationException(
+        "Connection string is not configured. See README.md for local setup instructions.");
+
 builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(connectionString));
 
 // ۳. سرویس‌های پروژه
@@ -40,6 +44,12 @@ builder.Services.AddCors(options =>
 });
 
 // ۵. احراز هویت
+var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+var jwtKey = jwtSettings["Key"];
+if (string.IsNullOrWhiteSpace(jwtKey))
+    throw new InvalidOperationException(
+        "JWT signing key is not configured. See README.md for local setup instructions.");
+
 builder.Services.AddAuthentication(opt =>
     {
         opt.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -47,7 +57,6 @@ builder.Services.AddAuthentication(opt =>
     })
     .AddJwtBearer(options =>
     {
-        var jwtSettings = builder.Configuration.GetSection("JwtSettings");
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -56,7 +65,7 @@ builder.Services.AddAuthentication(opt =>
             ValidateIssuerSigningKey = true,
             ValidIssuer = jwtSettings["Issuer"],
             ValidAudience = jwtSettings["Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]!))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
         };
     });
 builder.Services.AddAuthorization();
