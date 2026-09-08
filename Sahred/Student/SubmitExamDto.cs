@@ -2,9 +2,12 @@ namespace Sahred.Student;
 
 public class SubmitExamDto
 {
-    public Guid ExamId { get; set; }
-    public Dictionary<Guid, Guid?> MultipleChoiceAnswers { get; set; } = new();
+    /// <summary>شناسه جلسه آزمونی که با start-exam ساخته شده.</summary>
+    public Guid AttemptId { get; set; }
 
-    // Key: QuestionId, Value: The typed text for short-answer
+    // پاسخ‌های تستی دیگر اینجا فرستاده نمی‌شوند:
+    // آنها لحظه‌به‌لحظه از طریق check-answer در سرور ذخیره شده‌اند.
+
+    /// <summary>کلید: QuestionId — مقدار: متن پاسخ تشریحی</summary>
     public Dictionary<Guid, string> ShortAnswerTexts { get; set; } = new();
 }

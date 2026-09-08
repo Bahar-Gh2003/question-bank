@@ -1,6 +1,5 @@
-using System.Text.Json;
+using Application.Common;
 using Application.Contracts;
-using Domain;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,75 +16,52 @@ public class SubmitGradesCommandHandler : IRequestHandler<SubmitGradesCommand>
 
     public async Task Handle(SubmitGradesCommand request, CancellationToken cancellationToken)
     {
-        var attempt = await _unitOfWork.ExamAttemptRepository.GetByIdAsync(request.AttemptId, 
-            include: q => q.Include(e => e.Exam).Include(sa => sa.StudentAnswers));
+        // 🔧 اصلاح باگ: Level هم باید Include شود، چون پایین‌تر
+        // به attempt.Exam.Level.LevelNumber دسترسی داریم.
+        var attempt = await _unitOfWork.ExamAttemptRepository.GetByIdAsync(
+            request.AttemptId,
+            include: q => q.Include(e => e.Exam).ThenInclude(e => e.Level)
+                           .Include(sa => sa.StudentAnswers));
 
-        if (attempt == null) throw new Exception("سابقه آزمون یافت نشد.");
+        if (attempt is null)
+            throw new NotFoundException("سابقه آزمون یافت نشد.");
 
-        // ۲. ابتدا وضعیت IsCorrect را برای سوالات تشریحی که ادمین تصحیح کرده، در دیتابیس آپدیت می‌کنیم
+        // ۱. وضعیت IsCorrect سوالات تشریحی را طبق نظر ادمین به‌روز می‌کنیم
         foreach (var gradedAnswer in request.Dto.GradedAnswers)
         {
             var answerToUpdate = attempt.StudentAnswers
                 .FirstOrDefault(sa => sa.QuestionId == gradedAnswer.Key);
-            if (answerToUpdate != null)
-            {
+
+            if (answerToUpdate is not null)
                 answerToUpdate.IsCorrect = gradedAnswer.Value;
-            }
         }
 
-        // ۳. حالا نمره نهایی را دوباره بر اساس "تمام" پاسخ‌ها محاسبه می‌کنیم
-        int finalScore = 0;
+        // ۲. نمره نهایی را دوباره روی تمام پاسخ‌ها حساب می‌کنیم
         var questionIds = attempt.StudentAnswers.Select(sa => sa.QuestionId).ToList();
         var questions = await _unitOfWork.QuestionRepository.GetAllAsync(
-            predicate: q => questionIds.Contains(q.Id)
-        );
+            predicate: q => questionIds.Contains(q.Id));
 
-        // این حلقه حالا هم سوالات تستی (که IsCorrect آنها از قبل true بوده) 
-        // و هم تشریحی‌های تصحیح شده را در نظر می‌گیرد
-        foreach (var studentAnswer in attempt.StudentAnswers)
-        {
-            if (studentAnswer.IsCorrect == true)
-            {
-                finalScore += questions.First(q => q.Id == studentAnswer.QuestionId).Score;
-            }
-            // var question = questions.First(q => q.Id == studentAnswer.QuestionId);
-            // bool isAnswerCorrect = false;
-            //
-            // if (question.Type == QuestionType.MultipleChoice)
-            // {
-            //     // Re-evaluate the multiple-choice answer to be safe
-            //     var correctOptionId = question.Options.FirstOrDefault(o => o.IsCorrect)?.Id;
-            //     isAnswerCorrect = studentAnswer.SelectedOptionId == correctOptionId;
-            // }
-            // else // For short-answer, use the value we just updated
-            // {
-            //     isAnswerCorrect = studentAnswer.IsCorrect ?? false;
-            // }
+        var finalScore = attempt.StudentAnswers
+            .Where(sa => sa.IsCorrect == true)
+            .Sum(sa => questions.First(q => q.Id == sa.QuestionId).Score);
 
-            // if (isAnswerCorrect)
-            // {
-            //     finalScore += question.Score;
-            // }
-        }
-
-        // ۴. نمره نهایی و وضعیت قبولی را در رکورد اصلی تلاش، آپدیت می‌کنیم
         attempt.Score = finalScore;
         attempt.IsPassed = finalScore >= attempt.Exam.PassingScore;
 
-        if (attempt.IsPassed)
+        // ۳. ارتقای سطح در صورت قبولی
+        if (attempt.IsPassed && attempt.Exam.Level is not null)
         {
             var student = await _unitOfWork.UserRepository.GetByIdAsync(attempt.UserId);
             var nextLevel = await _unitOfWork.LevelRepository.FindFirstOrDefaultAsync(
-                l => l.LevelNumber == attempt.Exam.Level.LevelNumber + 1
-            );
+                l => l.LevelNumber == attempt.Exam.Level.LevelNumber + 1);
 
-            if (student != null && nextLevel != null)
+            if (student is not null && nextLevel is not null)
             {
                 student.CurrentLevelId = nextLevel.Id;
                 _unitOfWork.UserRepository.Update(student);
             }
         }
-        
+
         _unitOfWork.ExamAttemptRepository.Update(attempt);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
