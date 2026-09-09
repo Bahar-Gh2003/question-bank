@@ -53,48 +53,19 @@ else
 
     private UpdateExamDto? _updateExamDto;
     private List<LevelDto>? _levels;
-    // private TimeSpan? _selectedTime;
-    // private int _jalaliYear;
-    // private int _jalaliMonth;
-    // private int _jalaliDay;
+   
 
     protected override async Task OnInitializedAsync()
     {
         _updateExamDto = await Http.GetFromJsonAsync<UpdateExamDto>($"api/Exams/{ExamId}");
         _levels = await Http.GetFromJsonAsync<List<LevelDto>>("api/Levels");
-
-        // if (_updateExamDto?.StartTime != null)
-        // {
-        //     var persianCalendar = new PersianCalendar();
-        //     // زمان را به وقت محلی تبدیل می‌کنیم تا با ورودی ادمین هماهنگ باشد
-        //     var localStartTime = _updateExamDto.StartTime.Value;
-        //     _jalaliYear = persianCalendar.GetYear(localStartTime);
-        //     _jalaliMonth = persianCalendar.GetMonth(localStartTime);
-        //     _jalaliDay = persianCalendar.GetDayOfMonth(localStartTime);
-        //     _selectedTime = localStartTime.TimeOfDay;
-        // }
+        
     }
 
     private async Task HandleUpdateExam()
     {
         if (_updateExamDto == null) return;
-
-        // try
-        // {
-        //     var persianCalendar = new PersianCalendar();
-        //     DateTime gregorianDate = persianCalendar.ToDateTime(_jalaliYear, _jalaliMonth, _jalaliDay, 0, 0, 0, 0);
-        //     if (_selectedTime.HasValue)
-        //     {
-        //         // زمان را بدون تبدیل منطقه زمانی ذخیره می‌کنیم
-        //         _updateExamDto.StartTime = gregorianDate.Date + _selectedTime.Value;
-        //     }
-        // }
-        // catch (Exception)
-        // {
-        //     Snackbar.Add("تاریخ شمسی وارد شده معتبر نیست.", Severity.Error);
-        //     return;
-        // }
-
+        
         await Http.PutAsJsonAsync($"api/Exams/{ExamId}", _updateExamDto);
         Snackbar.Add("آزمون با موفقیت بروزرسانی شد.", Severity.Success);
         NavigationManager.NavigateTo("/admin/manage-exams?tab=list"); // <-- این خط را اصلاح کنید

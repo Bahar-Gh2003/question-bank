@@ -86,10 +86,6 @@
 @code {
     private CreateExamDto _createExamDto = new();
     private List<LevelDto>? _levels;
-    // private TimeSpan? _selectedTime = DateTime.Now.TimeOfDay;
-    // private int _jalaliYear = 1404;
-    // private int _jalaliMonth = 1;
-    // private int _jalaliDay = 1;
     [Parameter, SupplyParameterFromQuery]
     public string? Tab { get; set; }
 
@@ -117,15 +113,6 @@
         StateHasChanged();
     }
 
-    // private string ToPersianDateTimeString(DateTime gregorianDate)
-    // {
-    //     var persianCalendar = new PersianCalendar();
-    //     var year = persianCalendar.GetYear(gregorianDate);
-    //     var month = persianCalendar.GetMonth(gregorianDate).ToString("00");
-    //     var day = persianCalendar.GetDayOfMonth(gregorianDate).ToString("00");
-    //     var time = gregorianDate.ToString("HH:mm");
-    //     return $"{time} - {year}/{month}/{day}";
-    // }
     
     private async Task ConfirmDelete(Guid examId, string title)
     {
@@ -155,18 +142,7 @@
             return;
         }
         
-        // try
-        // {
-            // var persianCalendar = new PersianCalendar();
-            // DateTime gregorianDate = persianCalendar.ToDateTime(_jalaliYear, _jalaliMonth, _jalaliDay, 0, 0, 0, 0);
-            // _createExamDto.StartTime = gregorianDate.Date + (_selectedTime ?? TimeSpan.Zero);
-        // }
-        // catch (ArgumentOutOfRangeException)
-        // {
-            // Snackbar.Add("تاریخ شمسی وارد شده معتبر نیست.", Severity.Error);
-            // return;
-        // }
-
+        
         var response = await Http.PostAsJsonAsync("api/Exams", _createExamDto);
         if (response.IsSuccessStatusCode)
         {

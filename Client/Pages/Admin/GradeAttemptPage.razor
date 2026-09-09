@@ -71,8 +71,7 @@ else
     private List<GradingQuestionDto>? _gradingData;
     private Dictionary<Guid, bool> _gradedAnswers = new();
     private bool _isSaving = false;
-    private const string ApiBaseUrl = "https://localhost:7210";
-
+    private string ApiBaseUrl => Http.BaseAddress!.ToString().TrimEnd('/');
     protected override async Task OnInitializedAsync()
     {
         _gradingData = await Http.GetFromJsonAsync<List<GradingQuestionDto>>($"api/grading/{AttemptId}");

@@ -65,7 +65,7 @@ else
 }
 
 @code {
-    private const string ApiBaseUrl = "https://localhost:7210"; // آدرس API شما
+    private string ApiBaseUrl => Http.BaseAddress!.ToString().TrimEnd('/'); 
     private ProfileDto? _profile;
     private bool _isStudent = false;
     private IBrowserFile? _selectedFile;

@@ -13,8 +13,11 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 
 // ۲. ثبت HttpClient برای ارتباط با API
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri("https://localhost:7210") }); // آدرس API شما
+var apiBaseUrl = builder.Configuration["ApiBaseUrl"]
+                 ?? throw new InvalidOperationException(
+                     "ApiBaseUrl is not configured. See wwwroot/appsettings.json");
 
+builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(apiBaseUrl) });
 // ۳. ثبت سرویس‌های کتابخانه‌های جانبی
 builder.Services.AddMudServices();
 builder.Services.AddBlazoredLocalStorage();

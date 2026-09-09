@@ -482,3 +482,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# User-uploaded files
+Api/wwwroot/uploads/
+!Api/wwwroot/uploads/.gitkeep

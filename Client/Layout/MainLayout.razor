@@ -5,6 +5,7 @@
 @inject ILocalStorageService LocalStorage
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager NavigationManager
+@inject HttpClient Http
 @using Client.Auth
 
 
@@ -68,8 +69,7 @@
 
 @code {
     private bool _drawerOpen = true;
-    private const string ApiBaseUrl = "https://localhost:7210";
-    private MudTheme _theme = new MudTheme();
+    private string ApiBaseUrl => Http.BaseAddress!.ToString().TrimEnd('/');    private MudTheme _theme = new MudTheme();
     private ProfileDto? _profile;
     protected override void OnInitialized()
     {

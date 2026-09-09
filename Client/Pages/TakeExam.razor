@@ -96,8 +96,7 @@ else if (_examSession is not null)
     [Parameter] public Guid ExamId { get; set; }
 
     // TODO: این باید از appsettings کلاینت خوانده شود، نه hardcode
-    private const string ApiBaseUrl = "https://localhost:7210";
-
+    private string ApiBaseUrl => Http.BaseAddress!.ToString().TrimEnd('/');
     private ExamSessionDto? _examSession;
     private string? _loadError;
     private int _currentQuestionIndex;
