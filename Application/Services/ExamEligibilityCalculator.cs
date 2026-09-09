@@ -5,10 +5,10 @@ namespace Application.Services;
 public record ExamEligibility(bool CanStart, string Status, DateTime? NextAvailableAtUtc);
 
 /// <summary>
-/// تنها مرجع تصمیم‌گیری درباره اینکه یک دانشجو مجاز به شرکت در آزمون هست یا نه.
-/// هم صفحه «لیست آزمون‌ها» و هم endpoint «شروع آزمون» از همین استفاده می‌کنند
-/// تا هرگز بین چیزی که به کاربر نشان داده می‌شود و چیزی که سرور اجازه می‌دهد اختلاف پیش نیاید.
-/// همه زمان‌ها UTC هستند.
+/// The single source of truth for whether a student may take an exam.
+/// Both the exam list page and the start-exam endpoint use this,
+/// so what the user is shown can never disagree with what the server allows.
+/// All times are UTC.
 /// </summary>
 public static class ExamEligibilityCalculator
 {
@@ -27,7 +27,7 @@ public static class ExamEligibilityCalculator
         IEnumerable<ExamAttempt> attemptsForThisExam,
         DateTime utcNow)
     {
-        // فقط تلاش‌های تمام‌شده در شمارش حساب می‌شوند
+        // Only completed attempts count towards the limit
         var completed = attemptsForThisExam
             .Where(a => a.IsCompleted)
             .OrderBy(a => a.AttemptedAt)
@@ -38,15 +38,15 @@ public static class ExamEligibilityCalculator
 
         switch (completed.Count)
         {
-            // تلاش اول: همیشه در دسترس، بدون تاریخ انقضا
+            // First attempt: always available, never expires
             case 0:
                 return new ExamEligibility(true, StatusReady, null);
 
-            // تلاش دوم: بلافاصله بعد از تلاش اول، بدون تاریخ انقضا
+            // Second attempt: available immediately after the first, never expires
             case 1:
                 return new ExamEligibility(true, StatusReadyRetry, null);
 
-            // تلاش سوم: فقط بعد از ۲۴ ساعت، و فقط به اندازه مدت آزمون فرصت دارد
+            // Third attempt: only after 24 hours, and only for the exam's duration
             case 2:
                 var availableAt = completed[1].AttemptedAt.AddHours(RetryWaitHours);
 
@@ -58,7 +58,7 @@ public static class ExamEligibilityCalculator
                     ? new ExamEligibility(true, StatusReadyLastChance, availableAt)
                     : new ExamEligibility(false, StatusFailed, null);
 
-            // سه تلاش انجام شده و قبول نشده
+            // Three attempts made without passing
             default:
                 return new ExamEligibility(false, StatusFailed, null);
         }

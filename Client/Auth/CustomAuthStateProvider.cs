@@ -28,7 +28,7 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
         var claims = ParseClaimsFromJwt(authToken);
         var claimsIdentity = new ClaimsIdentity(claims, "jwtAuth", ClaimTypes.Name, ClaimTypes.Role);
         
-        // پر کردن سرویس با اطلاعات از توکن
+        // Populate the service from the token
         
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("bearer", authToken);
         return new AuthenticationState(new ClaimsPrincipal(claimsIdentity));
@@ -41,7 +41,7 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
         var authenticatedUser = new ClaimsPrincipal(claimsIdentity);
         var authState = Task.FromResult(new AuthenticationState(authenticatedUser));
         
-        // پر کردن سرویس با اطلاعات از توکن
+        // Populate the service from the token
         
         NotifyAuthenticationStateChanged(authState);
     }

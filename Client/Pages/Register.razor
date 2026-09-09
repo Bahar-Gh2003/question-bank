@@ -98,7 +98,7 @@
         _isLoadingCaptcha = true;
         StateHasChanged();
 
-        // شبیه‌سازی فراخوانی سرویس کپچا
+        // Simulates a captcha service call
         await Task.Delay(1500);
         _captchaToken = Guid.NewGuid().ToString("N"); 
         _isHumanVerified = true;

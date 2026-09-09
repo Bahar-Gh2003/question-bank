@@ -36,7 +36,7 @@ public class GetRankingForExamQueryHandler : IRequestHandler<GetRankingForExamQu
         {
             var attempt = rankedAttempts[i];
         
-            // رتبه هر نفر، جایگاه اولین نفری است که آن نمره را کسب کرده
+            // Each rank is the position of the first person who reached that score
             int rank = rankedAttempts.FindIndex(a => a.Score == attempt.Score) + 1;
         
             resultWithCorrectRank.Add(new ExamResultRankDto

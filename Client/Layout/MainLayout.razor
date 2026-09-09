@@ -100,13 +100,13 @@
     
     private async Task Logout()
     {
-        // حذف توکن از حافظه
+        // Remove the token from storage
         await LocalStorage.RemoveItemAsync("authToken");
     
-        // اطلاع به برنامه که کاربر خارج شده است
+        // Notify the app that the user signed out
         ((CustomAuthStateProvider)AuthStateProvider).NotifyUserLogout();
         
-        // هدایت کاربر به صفحه اصلی
+        // Redirect to the home page
         NavigationManager.NavigateTo("/");
     }
 }

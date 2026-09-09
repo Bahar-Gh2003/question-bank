@@ -29,8 +29,8 @@ public class StudentController : ControllerBase
     }
 
     /// <summary>
-    /// جایگزین GET take-exam/{id} شد.
-    /// حالا POST است چون در سرور حالت ایجاد می‌کند، و همه بررسی‌های مجوز اینجا انجام می‌شود.
+    /// Replaces the old GET take-exam/{id}.
+    /// It is a POST because it creates server-side state, and all eligibility checks happen here.
     /// </summary>
     [HttpPost("start-exam/{examId:guid}")]
     public async Task<ActionResult<ExamSessionDto>> StartExam(Guid examId)
@@ -43,7 +43,7 @@ public class StudentController : ControllerBase
         return Ok(session);
     }
 
-    /// <summary>بررسی یک پاسخ تستی در سرور. فقط درست/غلط برمی‌گرداند.</summary>
+    /// <summary>Grades a single multiple-choice answer server-side. Returns only correct/incorrect.</summary>
     [HttpPost("check-answer")]
     public async Task<ActionResult<CheckAnswerResultDto>> CheckAnswer([FromBody] CheckAnswerDto dto)
     {

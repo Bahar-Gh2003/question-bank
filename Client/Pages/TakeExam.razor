@@ -95,7 +95,7 @@ else if (_examSession is not null)
 @code {
     [Parameter] public Guid ExamId { get; set; }
 
-    // TODO: این باید از appsettings کلاینت خوانده شود، نه hardcode
+    // Derived from HttpClient.BaseAddress, which is configured in Program.cs
     private string ApiBaseUrl => Http.BaseAddress!.ToString().TrimEnd('/');
     private ExamSessionDto? _examSession;
     private string? _loadError;
@@ -116,7 +116,7 @@ else if (_examSession is not null)
 
     protected override async Task OnInitializedAsync()
     {
-        // سرور جلسه را می‌سازد (یا اگر جلسه بازی هست، همان را برمی‌گرداند)
+        // The server creates the session, or returns an existing open one
         var response = await Http.PostAsync($"api/student/start-exam/{ExamId}", null);
 
         if (!response.IsSuccessStatusCode)
@@ -140,7 +140,7 @@ else if (_examSession is not null)
             _shortAnswerTexts[q.QuestionId] = q.ShortAnswerText ?? "";
         }
 
-        // زمان باقی‌مانده را سرور تعیین می‌کند، نه مرورگر
+        // The remaining time comes from the server, not the browser
         _timeRemaining = TimeSpan.FromSeconds(_examSession.RemainingSeconds);
         _timeRemainingDisplay = _timeRemaining.ToString(@"mm\:ss");
         StartTimer();
@@ -158,7 +158,7 @@ else if (_examSession is not null)
         _isCheckingAnswer = true;
         try
         {
-            // تصمیم درست/غلط را سرور می‌گیرد — پاسخ صحیح هرگز به مرورگر نمی‌آید
+            // The server decides correct/incorrect - the answer never reaches the browser
             var response = await Http.PostAsJsonAsync("api/student/check-answer", new CheckAnswerDto
             {
                 AttemptId = _examSession.AttemptId,

@@ -18,7 +18,7 @@ public class GetGradingDataQueryHandler : IRequestHandler<GetGradingDataQuery, L
 
     public async Task<List<GradingQuestionDto>> Handle(GetGradingDataQuery request, CancellationToken cancellationToken)
     {
-        // ما سابقه آزمون را به همراه پاسخ‌های دانشجو و سوالات مربوطه می‌خوانیم
+        // Load the attempt together with the student's answers and their questions
         var attempt = await _unitOfWork.ExamAttemptRepository.GetByIdAsync(request.AttemptId,
             include: q => q.Include(ea => ea.StudentAnswers)
                            .ThenInclude(sa => sa.Question)
@@ -29,7 +29,7 @@ public class GetGradingDataQueryHandler : IRequestHandler<GetGradingDataQuery, L
 
         var gradingList = new List<GradingQuestionDto>();
         
-        // حالا روی پاسخ‌های ذخیره شده در دیتابیس پیمایش می‌کنیم
+        // Iterate over the answers stored in the database
         foreach (var studentAnswer in attempt.StudentAnswers)
         {
            

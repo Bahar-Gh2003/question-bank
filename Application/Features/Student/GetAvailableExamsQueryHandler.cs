@@ -23,14 +23,14 @@ public class GetAvailableExamsQueryHandler : IRequestHandler<GetAvailableExamsQu
         var studentAttempts = await _unitOfWork.ExamAttemptRepository.GetAllAsync(
             predicate: a => a.UserId == request.UserId);
 
-        // همه‌جا UTC — همان مبنایی که در دیتابیس ذخیره شده است
+        // UTC everywhere - the same basis used for storage in the database
         var utcNow = DateTime.UtcNow;
 
         return examsForLevel.Select(exam =>
         {
             var attemptsForThisExam = studentAttempts.Where(a => a.ExamId == exam.Id).ToList();
 
-            // دقیقاً همان محاسبه‌ای که StartExamCommandHandler انجام می‌دهد
+            // Exactly the same calculation StartExamCommandHandler performs
             var eligibility = ExamEligibilityCalculator.Evaluate(exam, attemptsForThisExam, utcNow);
 
             return new ExamListDto

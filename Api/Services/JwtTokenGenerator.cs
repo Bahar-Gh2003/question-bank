@@ -23,10 +23,10 @@ public class JwtTokenGenerator : ITokenGenerator
 
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()), // شناسه کاربر
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()), // شناسه یکتای توکن
-            new(ClaimTypes.Name, user.Username), // نام کاربری
-            new(ClaimTypes.Role, user.Role.ToString()), // نقش کاربر (Admin/Student)
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()), // User id
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()), // Unique token id
+            new(ClaimTypes.Name, user.Username), // Username
+            new(ClaimTypes.Role, user.Role.ToString()), // User role (Admin/Student)
             new("picture", user.ProfilePictureUrl ?? "") 
         };
 

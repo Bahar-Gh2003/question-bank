@@ -8,10 +8,10 @@ public class StudentAnswer : BaseEntity
     public Guid QuestionId { get; set; }
     public Question Question { get; set; }
 
-    public Guid? SelectedOptionId { get; set; }  // سوال تستی
-    public string? ShortAnswerText { get; set; }    // سوال تشریحی
+    public Guid? SelectedOptionId { get; set; }  // Multiple-choice question
+    public string? ShortAnswerText { get; set; }    // Short-answer question
     public bool? IsCorrect { get; set; }
 
-    /// <summary>تعداد دفعاتی که دانشجو به این سوال پاسخ داده. فقط در سرور تغییر می‌کند.</summary>
+    /// <summary>How many times the student answered this question. Only ever changed server-side.</summary>
     public int AttemptCount { get; set; }
 }

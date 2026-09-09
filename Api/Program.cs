@@ -11,13 +11,13 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ۱. ثبت سرویس‌ها
+// 1. Service registration
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpContextAccessor();
 
-// ۲. دیتابیس
+// 2. Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
     throw new InvalidOperationException(
@@ -25,25 +25,25 @@ if (string.IsNullOrWhiteSpace(connectionString))
 
 builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(connectionString));
 
-// ۳. سرویس‌های پروژه
+// 3. Application services
 // builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(IUnitOfWork).Assembly));
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Application.Features.Questions.CreateQuestionCommandHandler).Assembly));
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<ITokenGenerator, JwtTokenGenerator>();
 
-// ۴. CORS
+// 4. CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowBlazorApp", policy =>
     {
-        policy.WithOrigins("https://localhost:7028","http://localhost:5298") // پورت‌های پروژه Client
+        policy.WithOrigins("https://localhost:7028","http://localhost:5298") // Client project ports
               .AllowAnyMethod()
               .AllowAnyHeader();
     });
 });
 
-// ۵. احراز هویت
+// 5. Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var jwtKey = jwtSettings["Key"];
 if (string.IsNullOrWhiteSpace(jwtKey))
@@ -73,7 +73,7 @@ builder.Services.AddAuthorization();
 var app = builder.Build();
 app.UseMiddleware<Api.Middleware.ExceptionHandlingMiddleware>();
 
-// ۶. پایپ‌لاین Middleware
+// 6. Middleware pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

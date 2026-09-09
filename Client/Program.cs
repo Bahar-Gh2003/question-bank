@@ -9,20 +9,20 @@ using MudBlazor.Services;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
-// ۱. ثبت سرویس‌های اصلی Blazor
+// 1. Core Blazor services
 builder.RootComponents.Add<App>("#app");
 
-// ۲. ثبت HttpClient برای ارتباط با API
+// 2. HttpClient for talking to the API
 var apiBaseUrl = builder.Configuration["ApiBaseUrl"]
                  ?? throw new InvalidOperationException(
                      "ApiBaseUrl is not configured. See wwwroot/appsettings.json");
 
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(apiBaseUrl) });
-// ۳. ثبت سرویس‌های کتابخانه‌های جانبی
+// 3. Third-party library services
 builder.Services.AddMudServices();
 builder.Services.AddBlazoredLocalStorage();
 
-// ۴. ثبت سرویس‌های احراز هویت
+// 4. Authentication services
 builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
 

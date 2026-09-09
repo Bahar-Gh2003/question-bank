@@ -16,9 +16,8 @@ public class CreateExamCommandHandler : IRequestHandler<CreateExamCommand, Guid>
             throw new Exception("سطح باید مشخص شود.");
         }
 
-        // مشخص می‌کنیم که زمان ورودی ادمین، یک زمان محلی است
+        // Treat the admin's input as a local time
         // var localStartTime = DateTime.SpecifyKind(request.StartTime.Value, DateTimeKind.Local);
-        // // آن زمان محلی را برای ذخیره‌سازی به استاندارد جهانی UTC تبدیل می‌کنیم
         // var utcStartTime = localStartTime.ToUniversalTime();
 
         var exam = new Exam

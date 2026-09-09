@@ -7,12 +7,12 @@ using Shared.Student;
 namespace Application.Features.Student;
 
 /// <summary>
-/// آزمون را نهایی می‌کند. کلاینت فقط AttemptId و پاسخ‌های تشریحی را می‌فرستد؛
-/// پاسخ‌های تستی از قبل در سرور ذخیره شده‌اند و دوباره از کلاینت پذیرفته نمی‌شوند.
+/// Finalises the exam. The client sends only the AttemptId and short answers;
+/// multiple-choice answers are already stored server-side and are not re-accepted.
 /// </summary>
 public class SubmitExamCommandHandler : IRequestHandler<SubmitExamCommand, ExamResultDto>
 {
-    /// <summary>چند ثانیه ارفاق برای تأخیر شبکه هنگام ثبت خودکار در لحظه پایان.</summary>
+    /// <summary>Grace period for network latency when auto-submitting at the deadline.</summary>
     private const int GracePeriodSeconds = 30;
 
     private readonly IUnitOfWork _unitOfWork;
@@ -39,18 +39,18 @@ public class SubmitExamCommandHandler : IRequestHandler<SubmitExamCommand, ExamR
         var endsAt = attempt.StartedAt.AddMinutes(attempt.Exam.DurationInMinutes);
         var isLate = utcNow > endsAt.AddSeconds(GracePeriodSeconds);
 
-        // پاسخ‌های تشریحی فقط اگر در مهلت باشند پذیرفته می‌شوند
+        // Short answers are only accepted if submitted within the time limit
         if (!isLate)
         {
             foreach (var (questionId, text) in request.ShortAnswerTexts)
             {
                 var answer = attempt.StudentAnswers.FirstOrDefault(a => a.QuestionId == questionId);
-                if (answer is null) continue;  // سوالی که جزو این آزمون نبوده، نادیده گرفته می‌شود
+                if (answer is null) continue;  // Ignore questions that were not part of this attempt
                 answer.ShortAnswerText = text;
             }
         }
 
-        // نمره‌دهی فقط بر اساس داده‌های سرور
+        // Score using server-side data only
         var questionIds = attempt.StudentAnswers.Select(a => a.QuestionId).ToList();
         var questions = await _unitOfWork.QuestionRepository.GetAllAsync(
             predicate: q => questionIds.Contains(q.Id));
@@ -64,7 +64,7 @@ public class SubmitExamCommandHandler : IRequestHandler<SubmitExamCommand, ExamR
         attempt.AttemptedAt = isLate ? endsAt : utcNow;
         attempt.IsCompleted = true;
 
-        // ارتقای سطح
+        // Level promotion
         if (attempt.IsPassed && attempt.Exam.Level is not null)
         {
             var student = await _unitOfWork.UserRepository.GetByIdAsync(attempt.UserId);

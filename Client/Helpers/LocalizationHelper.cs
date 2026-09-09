@@ -33,7 +33,7 @@ public static class LocalizationHelper
 
         string finalString = $"{time} - {year}/{month}/{day}";
         
-        // در نهایت، کل رشته را به فارسی تبدیل می‌کنیم
+        // Finally, convert the whole string to Persian digits
         return finalString.ToPersianDigits();
     }
 }

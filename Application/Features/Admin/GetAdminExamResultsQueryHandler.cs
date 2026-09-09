@@ -25,7 +25,7 @@ public class GetAdminExamResultsQueryHandler : IRequestHandler<GetAdminExamResul
 
     var resultsDto = new AdminExamResultsDto();
 
-    // --- منطق جدید رتبه‌بندی برای تلاش اول ---
+    // Ranking for the first attempt
     var attempt1List = userAttempts.Where(ua => ua.Count >= 1).Select(ua => ua[0]).OrderByDescending(a => a.Score).ToList();
     resultsDto.Attempt1Results = attempt1List.Select(a => new ExamResultRankDto
     {
@@ -37,7 +37,7 @@ public class GetAdminExamResultsQueryHandler : IRequestHandler<GetAdminExamResul
         IsPassed = a.IsPassed
     }).ToList();
 
-    // --- منطق جدید رتبه‌بندی برای تلاش دوم ---
+    // Ranking for the second attempt
     var attempt2List = userAttempts.Where(ua => ua.Count >= 2).Select(ua => ua[1]).OrderByDescending(a => a.Score).ToList();
     resultsDto.Attempt2Results = attempt2List.Select(a => new ExamResultRankDto
     {
@@ -49,7 +49,7 @@ public class GetAdminExamResultsQueryHandler : IRequestHandler<GetAdminExamResul
         IsPassed = a.IsPassed
     }).ToList();
     
-    // --- منطق جدید رتبه‌بندی برای تلاش سوم ---
+    // Ranking for the third attempt
     var attempt3List = userAttempts.Where(ua => ua.Count >= 3).Select(ua => ua[2]).OrderByDescending(a => a.Score).ToList();
     resultsDto.Attempt3Results = attempt3List.Select(a => new ExamResultRankDto
     {

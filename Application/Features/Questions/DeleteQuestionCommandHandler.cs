@@ -20,23 +20,23 @@ public class DeleteQuestionCommandHandler : IRequestHandler<DeleteQuestionComman
             throw new System.InvalidOperationException("این سوال قابل حذف نیست زیرا توسط دانشجویان در آزمون پاسخ داده شده است.");
         }
         
-        // ۲. سوال و گزینه‌های آن را پیدا می‌کنیم
+        // 2. Load the question and its options
         var questionToDelete = await _unitOfWork.QuestionRepository.GetByIdAsync(request.QuestionId,
             include: q => q.Include(o => o.Options));
         
         if (questionToDelete != null)
         {
-            // ۳. ابتدا گزینه‌ها را حذف می‌کنیم
+            // 3. Delete the options first
             var options = questionToDelete.Options.ToList();
             foreach (var option in options)
             {
                 _unitOfWork.OptionRepository.Delete(option);
             }
 
-            // ۴. سپس خود سوال را حذف می‌کنیم
+            // 4. Then delete the question itself
             _unitOfWork.QuestionRepository.Delete(questionToDelete);
             
-            // ۵. تمام تغییرات را ذخیره می‌کنیم
+            // 5. Persist all changes
             await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
     }

@@ -20,7 +20,7 @@ public class DeleteExamCommandHandler : IRequestHandler<DeleteExamCommand>
 
         if (relatedAttempts.Any())
         {
-            // ۲. اگر سابقه‌ای وجود داشت، یک خطا برمی‌گردانیم
+            // 2. Refuse deletion if any attempt history exists
             throw new InvalidOperationException("این آزمون قابل حذف نیست زیرا دانشجویان در آن شرکت کرده‌اند.");
         }
         var examToDelete = await _unitOfWork.ExamRepository.GetByIdAsync(request.ExamId);

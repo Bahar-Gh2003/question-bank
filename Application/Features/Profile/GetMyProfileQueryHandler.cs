@@ -29,7 +29,7 @@ public class GetMyProfileQueryHandler : IRequestHandler<GetMyProfileQuery, Profi
             FullName = user.FullName,
             Username = user.Username,
             Email = user.Email,
-            PhoneNumber = user.PhoneNumber, // <-- این خط را اضافه کنید
+            PhoneNumber = user.PhoneNumber,
             DateOfBirth = user.DateOfBirth,
             CurrentLevelTitle = user.CurrentLevel?.Title ?? "No Level",
             ProfilePictureUrl = user.ProfilePictureUrl

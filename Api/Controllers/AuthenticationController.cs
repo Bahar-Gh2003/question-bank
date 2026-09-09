@@ -27,12 +27,12 @@ public class AuthenticationController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            // پیام خطا را به عنوان یک Bad Request به فرانت‌اند ارسال می‌کنیم
+            // Return the error message to the frontend as a Bad Request
             return BadRequest(ex.Message);
         }
         catch (Exception)
         {
-            // برای خطاهای پیش‌بینی نشده دیگر
+            // For any other unexpected errors
             return StatusCode(500, "یک خطای داخلی در سرور رخ داده است.");
         }
     }

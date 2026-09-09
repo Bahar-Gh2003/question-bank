@@ -87,7 +87,7 @@ else
             if (response.IsSuccessStatusCode)
             {
                 Snackbar.Add("کاربر با موفقیت حذف شد.", Severity.Success);
-                await LoadUsers(); // حالا، داده‌های تازه را بارگذاری می‌کنیم
+                await LoadUsers(); // Reload fresh data
             }
             else
             {

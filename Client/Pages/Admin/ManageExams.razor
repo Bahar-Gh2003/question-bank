@@ -97,7 +97,7 @@
     {
         if (Tab?.ToLower() == "list")
         {
-            _activeTabIndex = 1; // به تب "لیست آزمون‌ها" برو
+            _activeTabIndex = 1; // Switch to the exam list tab
         }
         await Task.WhenAll(LoadLevels(), LoadAllExams());
     }
@@ -127,7 +127,7 @@
             }
             else
             {
-                // خواندن و نمایش پیام خطای مشخص از API
+                // Read and display the specific error message returned by the API
                 var errorMessage = await response.Content.ReadAsStringAsync();
                 Snackbar.Add(errorMessage, Severity.Error);
             }

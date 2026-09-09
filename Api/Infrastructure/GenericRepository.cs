@@ -43,11 +43,10 @@ public class GenericRepository<T> : IGenericRepository<T> where T : BaseEntity
                 query = include(query);
 
             }
-            // ما دیگر از FindAsync استفاده نمی‌کنیم چون با Include کار نمی‌کند
+            // FindAsync is not used here because it does not support Include
             return await query.FirstOrDefaultAsync(e => e.Id == id);
         }
 
-        // این پیاده‌سازی بروزرسانی شده است
         public async Task<IReadOnlyList<T>> GetAllAsync(Func<IQueryable<T>, IIncludableQueryable<T, object>>? include = null)
         {
             IQueryable<T> query = _context.Set<T>();

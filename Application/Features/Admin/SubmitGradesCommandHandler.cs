@@ -16,8 +16,8 @@ public class SubmitGradesCommandHandler : IRequestHandler<SubmitGradesCommand>
 
     public async Task Handle(SubmitGradesCommand request, CancellationToken cancellationToken)
     {
-        // 🔧 اصلاح باگ: Level هم باید Include شود، چون پایین‌تر
-        // به attempt.Exam.Level.LevelNumber دسترسی داریم.
+        // Bug fix: Level must be included as well, because
+        // attempt.Exam.Level.LevelNumber is accessed below.
         var attempt = await _unitOfWork.ExamAttemptRepository.GetByIdAsync(
             request.AttemptId,
             include: q => q.Include(e => e.Exam).ThenInclude(e => e.Level)
@@ -26,7 +26,7 @@ public class SubmitGradesCommandHandler : IRequestHandler<SubmitGradesCommand>
         if (attempt is null)
             throw new NotFoundException("سابقه آزمون یافت نشد.");
 
-        // ۱. وضعیت IsCorrect سوالات تشریحی را طبق نظر ادمین به‌روز می‌کنیم
+        // 1. Apply the admin's grading to the short-answer questions
         foreach (var gradedAnswer in request.Dto.GradedAnswers)
         {
             var answerToUpdate = attempt.StudentAnswers
@@ -36,7 +36,7 @@ public class SubmitGradesCommandHandler : IRequestHandler<SubmitGradesCommand>
                 answerToUpdate.IsCorrect = gradedAnswer.Value;
         }
 
-        // ۲. نمره نهایی را دوباره روی تمام پاسخ‌ها حساب می‌کنیم
+        // 2. Recalculate the final score across all answers
         var questionIds = attempt.StudentAnswers.Select(sa => sa.QuestionId).ToList();
         var questions = await _unitOfWork.QuestionRepository.GetAllAsync(
             predicate: q => questionIds.Contains(q.Id));
@@ -48,7 +48,7 @@ public class SubmitGradesCommandHandler : IRequestHandler<SubmitGradesCommand>
         attempt.Score = finalScore;
         attempt.IsPassed = finalScore >= attempt.Exam.PassingScore;
 
-        // ۳. ارتقای سطح در صورت قبولی
+        // 3. Promote the student's level if they passed
         if (attempt.IsPassed && attempt.Exam.Level is not null)
         {
             var student = await _unitOfWork.UserRepository.GetByIdAsync(attempt.UserId);

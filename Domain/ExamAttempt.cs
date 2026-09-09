@@ -5,13 +5,13 @@ public class ExamAttempt : BaseEntity
     public int Score { get; set; }
     public bool IsPassed { get; set; }
 
-    /// <summary>زمان شروع آزمون (UTC) — مبنای محاسبه تایمر در سرور.</summary>
+    /// <summary>When the exam started (UTC) - the basis for the server-side timer.</summary>
     public DateTime StartedAt { get; set; }
 
-    /// <summary>زمان ثبت نهایی آزمون (UTC).</summary>
+    /// <summary>When the exam was finally submitted (UTC).</summary>
     public DateTime AttemptedAt { get; set; }
 
-    /// <summary>تا وقتی false باشد این تلاش هنوز باز است و در شمارش تلاش‌ها حساب نمی‌شود.</summary>
+    /// <summary>While false the attempt is still open and does not count towards the attempt limit.</summary>
     public bool IsCompleted { get; set; }
 
     public Guid UserId { get; set; }

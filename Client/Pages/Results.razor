@@ -124,13 +124,13 @@ else
     {
         if (_selectedAttemptId == attemptId)
         {
-            _selectedAttemptId = null; // بستن پنل با کلیک مجدد
+            _selectedAttemptId = null; // Clicking again collapses the panel
             _selectedAttemptStatus = null;
             return;
         }
 
         _selectedAttemptId = attemptId;
-        _selectedAttemptStatus = null; // نمایش حالت لودینگ
+        _selectedAttemptStatus = null; // Show the loading state
         StateHasChanged();
         
         try

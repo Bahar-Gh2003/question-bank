@@ -196,7 +196,6 @@
             }
             else
             {
-                // Snackbar.Add("خطا در حذف سوال.", Severity.Error);
                 string errorMessage = await response.Content.ReadAsStringAsync();
                 Snackbar.Add(errorMessage, Severity.Error);
             }

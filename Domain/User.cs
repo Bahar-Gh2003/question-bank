@@ -9,8 +9,8 @@ public class User : BaseEntity
     public string? ProfilePictureUrl { get; set; }
     public UserRole Role { get; set; }
     public string? PhoneNumber { get; set; }
-    public Gender? Gender { get; set; } // فیلد جدید
-    public DateTime? DateOfBirth { get; set; } // فیلد جدید - به صورت میلادی ذخیره می‌شود
+    public Gender? Gender { get; set; }
+    public DateTime? DateOfBirth { get; set; } // Stored as a Gregorian date
     public Guid? CurrentLevelId { get; set; }
     public Level? CurrentLevel { get; set; }
 }

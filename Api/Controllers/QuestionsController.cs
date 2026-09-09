@@ -59,7 +59,7 @@ public class QuestionsController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            // پیام خطا را به عنوان یک Bad Request به فرانت‌اند ارسال می‌کنیم
+            // Return the error message to the frontend as a Bad Request
             return BadRequest(ex.Message);
         }
     }

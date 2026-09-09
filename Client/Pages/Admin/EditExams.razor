@@ -68,7 +68,7 @@ else
         
         await Http.PutAsJsonAsync($"api/Exams/{ExamId}", _updateExamDto);
         Snackbar.Add("آزمون با موفقیت بروزرسانی شد.", Severity.Success);
-        NavigationManager.NavigateTo("/admin/manage-exams?tab=list"); // <-- این خط را اصلاح کنید
+        NavigationManager.NavigateTo("/admin/manage-exams?tab=list");
     }
 
 }

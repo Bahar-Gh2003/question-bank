@@ -10,12 +10,12 @@ using Shared.Student;
 namespace Application.Features.Student;
 
 /// <summary>
-/// جلسه آزمون را در سرور می‌سازد.
-/// این تنها راه شروع آزمون است و همه بررسی‌های مجوز اینجا انجام می‌شود.
+/// Creates the exam session on the server.
+/// This is the only way to start an exam; every eligibility check happens here.
 /// </summary>
 public class StartExamCommandHandler : IRequestHandler<StartExamCommand, ExamSessionDto>
 {
-    private const int QuestionsPerExam = 15; // TODO: بهتر است فیلدی روی Exam باشد
+    private const int QuestionsPerExam = 15; // TODO: this should be a field on Exam
 
     private readonly IUnitOfWork _unitOfWork;
     public StartExamCommandHandler(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
@@ -33,14 +33,14 @@ public class StartExamCommandHandler : IRequestHandler<StartExamCommand, ExamSes
         if (student is null)
             throw new NotFoundException("کاربر یافت نشد.");
 
-        // بررسی ۱: آزمون باید متعلق به سطح فعلی دانشجو باشد
+        // Check 1: the exam must belong to the student's current level
         if (student.CurrentLevelId != exam.LevelId)
             throw new ForbiddenException("این آزمون مربوط به سطح فعلی شما نیست.");
 
         var attempts = (await _unitOfWork.ExamAttemptRepository.GetAllAsync(
             predicate: a => a.UserId == request.UserId && a.ExamId == request.ExamId)).ToList();
 
-        // بررسی ۲: اگر جلسه بازی وجود دارد، همان را ادامه بده (مثلاً کاربر صفحه را رفرش کرده)
+        // Check 2: resume an open session if one exists (e.g. the user refreshed the page)
         var openAttempt = attempts.FirstOrDefault(a => !a.IsCompleted);
         if (openAttempt is not null)
         {
@@ -49,18 +49,18 @@ public class StartExamCommandHandler : IRequestHandler<StartExamCommand, ExamSes
             if (utcNow < endsAt)
                 return await BuildSessionAsync(exam, openAttempt.Id, (int)(endsAt - utcNow).TotalSeconds);
 
-            // وقتش تمام شده بوده و هرگز ثبت نشده → همین حالا ببندش
+            // Time ran out and it was never submitted -> close it now
             await CloseExpiredAttemptAsync(openAttempt, exam, endsAt, cancellationToken);
             attempts = (await _unitOfWork.ExamAttemptRepository.GetAllAsync(
                 predicate: a => a.UserId == request.UserId && a.ExamId == request.ExamId)).ToList();
         }
 
-        // بررسی ۳: قوانین تعداد تلاش و زمان انتظار — همان منطقی که به کاربر نشان داده می‌شود
+        // Check 3: attempt count and waiting period - the same rules shown to the user
         var eligibility = ExamEligibilityCalculator.Evaluate(exam, attempts, utcNow);
         if (!eligibility.CanStart)
             throw new BusinessRuleException($"امکان شروع این آزمون وجود ندارد. وضعیت فعلی: {eligibility.Status}");
 
-        // انتخاب سوال‌ها و ساخت جلسه
+        // Pick the questions and build the session
         var pool = await _unitOfWork.QuestionRepository.GetAllAsync(
             predicate: q => q.LevelId == exam.LevelId,
             include: q => q.Include(o => o.Options));
@@ -80,8 +80,8 @@ public class StartExamCommandHandler : IRequestHandler<StartExamCommand, ExamSes
             IsCompleted = false
         };
 
-        // سوال‌های انتخاب‌شده همین حالا ذخیره می‌شوند تا موقع ثبت،
-        // سرور دقیقاً بداند کدام سوال‌ها به این دانشجو داده شده بود.
+        // The chosen questions are stored now so that at submit time
+        // the server knows exactly which questions this student was given.
         foreach (var q in selected)
         {
             attempt.StudentAnswers.Add(new StudentAnswer
@@ -98,7 +98,7 @@ public class StartExamCommandHandler : IRequestHandler<StartExamCommand, ExamSes
         return await BuildSessionAsync(exam, attempt.Id, exam.DurationInMinutes * 60);
     }
 
-    /// <summary>جلسه‌ای که وقتش تمام شده اما هرگز ثبت نشده را می‌بندد و نمره می‌دهد.</summary>
+    /// <summary>Closes and scores a session whose time expired without being submitted.</summary>
     private async Task CloseExpiredAttemptAsync(
         ExamAttempt attempt, Exam exam, DateTime endsAt, CancellationToken cancellationToken)
     {
@@ -146,7 +146,7 @@ public class StartExamCommandHandler : IRequestHandler<StartExamCommand, ExamSes
                 SelectedOptionId = sa.SelectedOptionId,
                 ShortAnswerText = sa.ShortAnswerText,
                 Options = q.Type == QuestionType.MultipleChoice
-                    // فقط Id و متن گزینه — IsCorrect عمداً پر نمی‌شود
+                    // Only the option id and text - IsCorrect is deliberately left unset
                     ? q.Options.Select(o => new OptionDto { Id = o.Id, Content = o.Content }).ToList()
                     : new List<OptionDto>()
             };

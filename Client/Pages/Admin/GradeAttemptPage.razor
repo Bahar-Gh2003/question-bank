@@ -48,7 +48,7 @@ else
                     }
                     
                 }
-                else // سوال تشریحی
+                else // Short-answer question
                 {
                     <MudText>تصحیح دستی:</MudText>
                     <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Color="@GetGradeButtonColor(item.QuestionId, true)" OnClick="@(() => GradeAnswer(item.QuestionId, true))">صحیح</MudIconButton>

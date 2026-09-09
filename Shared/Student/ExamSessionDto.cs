@@ -2,15 +2,15 @@ namespace Shared.Student;
 
 public class ExamSessionDto
 {
-    /// <summary>شناسه این جلسه آزمون. کلاینت باید در هر درخواست بعدی آن را بفرستد.</summary>
+    /// <summary>Identifies this exam session. The client must send it with every follow-up request.</summary>
     public Guid AttemptId { get; set; }
 
     public string ExamTitle { get; set; }
     public int DurationInMinutes { get; set; }
 
     /// <summary>
-    /// ثانیه‌های باقی‌مانده که سرور محاسبه کرده است.
-    /// تایمر کلاینت فقط نمایشی است؛ مرجع نهایی همیشه سرور است.
+    /// Seconds remaining, as calculated by the server.
+    /// The client timer is display only; the server is always authoritative.
     /// </summary>
     public int RemainingSeconds { get; set; }
 

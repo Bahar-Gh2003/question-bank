@@ -5,8 +5,8 @@ using Application.Common;
 namespace Api.Middleware;
 
 /// <summary>
-/// خطاهای لایه Application را به کد HTTP درست تبدیل می‌کند،
-/// تا کنترلرها دیگر نیازی به try/catch نداشته باشند و کلاینت پیام معنادار بگیرد.
+/// Maps Application-layer exceptions to the correct HTTP status codes,
+/// so controllers no longer need try/catch and clients get a meaningful message.
 /// </summary>
 public class ExceptionHandlingMiddleware
 {

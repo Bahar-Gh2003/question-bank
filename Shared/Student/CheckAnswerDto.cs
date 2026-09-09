@@ -1,6 +1,6 @@
 namespace Shared.Student;
 
-/// <summary>درخواست بررسی یک پاسخ تستی. کلاینت این را به سرور می‌فرستد.</summary>
+/// <summary>A request to grade one multiple-choice answer, sent by the client.</summary>
 public class CheckAnswerDto
 {
     public Guid AttemptId { get; set; }

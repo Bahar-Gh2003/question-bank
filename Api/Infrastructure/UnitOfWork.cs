@@ -14,7 +14,6 @@ public class UnitOfWork : IUnitOfWork
     private IGenericRepository<ExamAttempt>? _examAttemptRepository;
     private IGenericRepository<Option>? _optionRepository;
     private IGenericRepository<StudentAnswer>? _studentAnswerRepository;
-    // ... بقیه ریپازیتوری‌ها
 
     public UnitOfWork(ApplicationDbContext context) => _context = context;
 

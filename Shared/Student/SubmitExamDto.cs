@@ -2,12 +2,12 @@ namespace Shared.Student;
 
 public class SubmitExamDto
 {
-    /// <summary>شناسه جلسه آزمونی که با start-exam ساخته شده.</summary>
+    /// <summary>The session created by start-exam.</summary>
     public Guid AttemptId { get; set; }
 
-    // پاسخ‌های تستی دیگر اینجا فرستاده نمی‌شوند:
-    // آنها لحظه‌به‌لحظه از طریق check-answer در سرور ذخیره شده‌اند.
+    // Multiple-choice answers are no longer sent here:
+    // they are stored server-side as they happen, via check-answer.
 
-    /// <summary>کلید: QuestionId — مقدار: متن پاسخ تشریحی</summary>
+    /// <summary>Key: QuestionId - Value: the short answer text</summary>
     public Dictionary<Guid, string> ShortAnswerTexts { get; set; } = new();
 }

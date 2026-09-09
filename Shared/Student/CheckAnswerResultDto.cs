@@ -1,8 +1,8 @@
 namespace Shared.Student;
 
 /// <summary>
-/// پاسخ سرور به بررسی یک گزینه.
-/// فقط نتیجه برگردانده می‌شود، نه اینکه گزینه درست کدام است.
+/// The server's verdict on a single option.
+/// Only the outcome is returned, never which option was correct.
 /// </summary>
 public class CheckAnswerResultDto
 {

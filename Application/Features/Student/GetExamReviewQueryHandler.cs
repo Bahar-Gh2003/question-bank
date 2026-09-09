@@ -20,13 +20,13 @@ public class GetExamReviewQueryHandler : IRequestHandler<GetExamReviewQuery, Exa
         if (attempt == null || attempt.UserId != request.UserId)
             throw new Exception("سابقه آزمون یافت نشد.");
 
-        // ۱. تمام سوالات آزمونی که دانشجو در آن شرکت کرده را می‌خوانیم
+        // 1. Load every question from the exam the student attempted
         var allExamQuestions = await _unitOfWork.QuestionRepository.GetAllAsync(
             predicate: q => q.LevelId == attempt.Exam.LevelId,
             include: q => q.Include(o => o.Options)
         );
 
-        // ۲. حالا برای هر سوال، پاسخ دانشجو را پیدا می‌کنیم (اگر وجود داشته باشد)
+        // 2. For each question, find the student's answer if one exists
         var reviewQuestions = allExamQuestions.Select(q =>
         {
             var studentAnswerRecord = attempt.StudentAnswers.FirstOrDefault(sa => sa.QuestionId == q.Id);
@@ -34,7 +34,7 @@ public class GetExamReviewQueryHandler : IRequestHandler<GetExamReviewQuery, Exa
             Guid? selectedOptionId = null;
             bool isCorrect = false;
 
-            if (studentAnswerRecord != null) // اگر دانشجو پاسخی ثبت کرده بود
+            if (studentAnswerRecord != null) // If the student submitted an answer
             {
                 if (q.Type == QuestionType.MultipleChoice)
                 {

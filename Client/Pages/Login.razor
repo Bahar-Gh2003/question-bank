@@ -50,17 +50,17 @@
             var result = await response.Content.ReadFromJsonAsync<AuthenticationResponseDto>();
             if (result?.Token != null)
             {
-                // ۱. ذخیره توکن
+                // 1. Store the token
                 await LocalStorage.SetItemAsync("authToken", result.Token);
 
-                // ۲. اطلاع به برنامه که کاربر وارد شده است
+                // 2. Notify the app that the user signed in
                 ((CustomAuthStateProvider)AuthStateProvider).NotifyUserAuthentication(result.Token);
 
-                // ۳. خواندن نقش کاربر از توکن
+                // 3. Read the user's role from the token
                 var claims = CustomAuthStateProvider.ParseClaimsFromJwt(result.Token);
                 var role = claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
 
-                // ۴. هدایت بر اساس نقش
+                // 4. Redirect based on role
                 if (role == "Admin")
                 {
                     NavigationManager.NavigateTo("/admin/dashboard", forceLoad: true);

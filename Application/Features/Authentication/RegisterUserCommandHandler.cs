@@ -14,7 +14,6 @@ public class RegisterUserCommandHandler : IRequestHandler<RegisterUserCommand>
         _unitOfWork = unitOfWork;
     }
 
-    // 1. نوع بازگشتی از Task<Unit> به Task تغییر کرد
     public async Task Handle(RegisterUserCommand request, CancellationToken cancellationToken)
     {
         var existingUser = await _unitOfWork.UserRepository.FindFirstOrDefaultAsync(u => u.Username == request.Dto.Username);
@@ -23,12 +22,11 @@ public class RegisterUserCommandHandler : IRequestHandler<RegisterUserCommand>
             throw new InvalidOperationException("این نام کاربری قبلاً استفاده شده است. لطفاً نام دیگری انتخاب کنید.");
         }
 
-        // --- شروع کد جدید ---
-        // ابتدا سطح ۱ را از دیتابیس پیدا می‌کنیم
+        // Look up level 1 first
         var levelOne = await _unitOfWork.LevelRepository.FindFirstOrDefaultAsync(l => l.LevelNumber == 1);
         if (levelOne == null)
         {
-            // اگر سطح ۱ وجود نداشت، یک خطا می‌دهیم تا ادمین ابتدا آن را بسازد
+            // Fail if level 1 is missing so the admin creates it first
             throw new Exception("سطح ۱ در دیتابیس یافت نشد. لطفاً ابتدا سطوح را ایجاد کنید.");
         }
         
@@ -52,9 +50,9 @@ public class RegisterUserCommandHandler : IRequestHandler<RegisterUserCommand>
             Id = Guid.NewGuid(),
             FullName = dto.FullName,
             Username = dto.Username,
-            PhoneNumber = dto.PhoneNumber, // جایگزین ایمیل شد
-            Gender = dto.Gender,           // فیلد جدید
-            DateOfBirth = dateOfBirth,     // فیلد جدید
+            PhoneNumber = dto.PhoneNumber,
+            Gender = dto.Gender,
+            DateOfBirth = dateOfBirth,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
             Email = dto.Email,
             Role = UserRole.Student,

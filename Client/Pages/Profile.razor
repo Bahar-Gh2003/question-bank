@@ -70,7 +70,7 @@ else
     private bool _isStudent = false;
     private IBrowserFile? _selectedFile;
     
-    // ما فقط از این یک متغیر برای نمایش عکس استفاده می‌کنیم
+    // A single variable drives which image is displayed
     private string _imageUrlToDisplay = "images/default-avatar.png";
 
     protected override async Task OnInitializedAsync()
@@ -100,7 +100,7 @@ else
         _selectedFile = e.File;
         if (_selectedFile == null) return;
 
-        // پیش‌نمایش را ساخته و مستقیماً در متغیر اصلی نمایش قرار می‌دهیم
+        // Build the preview and assign it straight to the display variable
         var buffer = new byte[_selectedFile.Size];
         await _selectedFile.OpenReadStream(long.MaxValue).ReadAsync(buffer);
         var imageBase64 = Convert.ToBase64String(buffer);
@@ -113,7 +113,7 @@ else
     {
         if (_profile == null) return;
 
-        // اگر فایل جدیدی انتخاب شده بود، ابتدا آن را آپلود می‌کنیم
+        // If a new file was chosen, upload it first
         if (_selectedFile != null)
         {
             using var content = new MultipartFormDataContent();
@@ -145,8 +145,8 @@ else
         if (response.IsSuccessStatusCode)
         {
             Snackbar.Add("پروفایل با موفقیت بروزرسانی شد!", Severity.Success);
-            _selectedFile = null; // فایل انتخاب شده را پاک می‌کنیم
-            await LoadProfile(); // پروفایل را دوباره بارگذاری می‌کنیم تا عکس نهایی از سرور نمایش داده شود
+            _selectedFile = null; // Clear the selected file
+            await LoadProfile(); // Reload the profile so the stored image is shown
         }
         else
         {
