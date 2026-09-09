@@ -1,5 +1,6 @@
 using Application.Common;
 using Application.Contracts;
+using Domain;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Shared.Student;
@@ -50,37 +51,68 @@ public class SubmitExamCommandHandler : IRequestHandler<SubmitExamCommand, ExamR
             }
         }
 
-        // Score using server-side data only
         var questionIds = attempt.StudentAnswers.Select(a => a.QuestionId).ToList();
-        var questions = await _unitOfWork.QuestionRepository.GetAllAsync(
-            predicate: q => questionIds.Contains(q.Id));
+        var questions = (await _unitOfWork.QuestionRepository.GetAllAsync(
+            predicate: q => questionIds.Contains(q.Id))).ToList();
 
+        // Does anything still need a human to look at it?
+        var needsGrading = attempt.StudentAnswers.Any(a =>
+            questions.First(q => q.Id == a.QuestionId).Type == QuestionType.ShortAnswer
+            && !string.IsNullOrWhiteSpace(a.ShortAnswerText));
+
+        // Score using server-side data only. While ungraded this covers
+        // the multiple-choice questions alone and is therefore provisional.
         var totalScore = attempt.StudentAnswers
             .Where(a => a.IsCorrect == true)
             .Sum(a => questions.First(q => q.Id == a.QuestionId).Score);
 
         attempt.Score = totalScore;
-        attempt.IsPassed = totalScore >= attempt.Exam.PassingScore;
         attempt.AttemptedAt = isLate ? endsAt : utcNow;
         attempt.IsCompleted = true;
+        attempt.IsGraded = !needsGrading;
 
-        // Level promotion
-        if (attempt.IsPassed && attempt.Exam.Level is not null)
+        // Pass/fail and promotion wait for grading, so a student is never told
+        // they failed on the strength of half a score.
+        if (attempt.IsGraded)
         {
-            var student = await _unitOfWork.UserRepository.GetByIdAsync(attempt.UserId);
-            var nextLevel = await _unitOfWork.LevelRepository.FindFirstOrDefaultAsync(
-                l => l.LevelNumber == attempt.Exam.Level.LevelNumber + 1);
+            attempt.IsPassed = totalScore >= attempt.Exam.PassingScore;
 
-            if (student is not null && nextLevel is not null)
-            {
-                student.CurrentLevelId = nextLevel.Id;
-                _unitOfWork.UserRepository.Update(student);
-            }
+            if (attempt.IsPassed)
+                await PromoteIfEligibleAsync(attempt);
         }
 
         _unitOfWork.ExamAttemptRepository.Update(attempt);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return new ExamResultDto { TotalScore = totalScore, IsPassed = attempt.IsPassed };
+        return new ExamResultDto
+        {
+            TotalScore = totalScore,
+            IsPassed = attempt.IsPassed,
+            AwaitingGrading = needsGrading
+        };
+    }
+
+    /// <summary>
+    /// Moves the student up one level, but only when they are actually sitting at
+    /// the exam's level. Passing a lower-level exam later must never demote them.
+    /// </summary>
+    private async Task PromoteIfEligibleAsync(ExamAttempt attempt)
+    {
+        if (attempt.Exam.Level is null) return;
+
+        var student = await _unitOfWork.UserRepository.GetByIdAsync(attempt.UserId);
+        if (student?.CurrentLevelId is null) return;
+
+        var currentLevel = await _unitOfWork.LevelRepository.GetByIdAsync(student.CurrentLevelId.Value);
+        if (currentLevel is null) return;
+
+        if (attempt.Exam.Level.LevelNumber != currentLevel.LevelNumber) return;
+
+        var nextLevel = await _unitOfWork.LevelRepository.FindFirstOrDefaultAsync(
+            l => l.LevelNumber == currentLevel.LevelNumber + 1);
+        if (nextLevel is null) return;
+
+        student.CurrentLevelId = nextLevel.Id;
+        _unitOfWork.UserRepository.Update(student);
     }
 }

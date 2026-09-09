@@ -19,6 +19,13 @@ else
         <MudText Typo="Typo.h4" GutterBottom="true">مرور آزمون: @_reviewData.ExamTitle</MudText>
     </div>
 
+    @if (_reviewData.AwaitingGrading)
+    {
+        <MudAlert Severity="Severity.Info" Class="mb-4">
+            سوالات تشریحی این آزمون هنوز توسط مدیر تصحیح نشده‌اند. نمره نهایی و وضعیت قبولی پس از تصحیح مشخص می‌شود.
+        </MudAlert>
+    }
+
     @foreach (var (question, index) in _reviewData.Questions.Select((q, i) => (q, i)))
     {
         <MudPaper Class="pa-4 my-4">
@@ -30,45 +37,65 @@ else
                 </div>
             }
             <MudText>@question.Content</MudText>
-            
-         
+
             @if (question.Type == QuestionType.MultipleChoice)
             {
-                @if(question.IsStudentAnswerCorrect)
-              {
-                <MudAlert Severity="Severity.Success" Class="mt-2"><b>پاسخ شما:</b> @question.StudentAnswer</MudAlert>
-               }
+                @if (question.IsStudentAnswerCorrect == true)
+                {
+                    <MudAlert Severity="Severity.Success" Class="mt-2"><b>پاسخ شما:</b> @question.StudentAnswer</MudAlert>
+                }
                 else
-              {
-                <MudAlert Severity="Severity.Error" Class="mt-2"><b>پاسخ شما:</b> @question.StudentAnswer</MudAlert>
-                @* <MudAlert Severity="Severity.Info" Class="mt-2"><b>پاسخ صحیح:</b> @question.CorrectAnswer</MudAlert> *@
-              }
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-2"><b>پاسخ شما:</b> @question.StudentAnswer</MudAlert>
+                }
+
                 <MudRadioGroup T="Guid?" ReadOnly="true" Value="@question.SelectedOptionId" Class="mt-2">
                     @foreach (var option in question.Options)
                     {
-                        <MudRadio T="Guid?" Option="@option.Id" ReadOnly="true"   Color="@(option.IsCorrect ? Color.Success : Color.Default)">
+                        <MudRadio T="Guid?" Option="@option.Id" ReadOnly="true" Color="@(option.IsCorrect ? Color.Success : Color.Default)">
                             @option.Content
                         </MudRadio>
-                        
                     }
                 </MudRadioGroup>
             }
             else
             {
-                <MudAlert Severity="Severity.Info" Class="mt-2">این سوال پس از تصحیح توسط ادمین، نمره‌دهی خواهد شد.</MudAlert>
-                <MudAlert Severity="Severity.Normal" Class="mt-2"><b>پاسخ شما:</b> @question.StudentAnswer</MudAlert>
+                @* IsStudentAnswerCorrect is null while the admin has not graded this answer yet *@
+                @if (question.IsStudentAnswerCorrect == null)
+                {
+                    <MudAlert Severity="Severity.Info" Class="mt-2">
+                        این سوال پس از تصحیح توسط مدیر، نمره‌دهی خواهد شد.
+                    </MudAlert>
+                    <MudAlert Severity="Severity.Normal" Class="mt-2"><b>پاسخ شما:</b> @question.StudentAnswer</MudAlert>
+                }
+                else if (question.IsStudentAnswerCorrect == true)
+                {
+                    <MudAlert Severity="Severity.Success" Class="mt-2">
+                        <b>پاسخ شما:</b> @question.StudentAnswer
+                    </MudAlert>
+                    <MudText Typo="Typo.body2" Class="mt-1">این پاسخ توسط مدیر صحیح تشخیص داده شد.</MudText>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-2">
+                        <b>پاسخ شما:</b> @question.StudentAnswer
+                    </MudAlert>
+                    <MudText Typo="Typo.body2" Class="mt-1">این پاسخ توسط مدیر نادرست تشخیص داده شد.</MudText>
+                }
             }
-            
         </MudPaper>
     }
+
     <MudButton Variant="Variant.Outlined" OnClick="@(() => NavigationManager.NavigateTo("/results"))">بازگشت به کارنامه</MudButton>
 }
 
 @code {
     [Parameter]
     public Guid AttemptId { get; set; }
+
     private ExamReviewDto? _reviewData;
-    private string ApiBaseUrl => Http.BaseAddress!.ToString().TrimEnd('/');    
+    private string ApiBaseUrl => Http.BaseAddress!.ToString().TrimEnd('/');
+
     protected override async Task OnInitializedAsync()
     {
         _reviewData = await Http.GetFromJsonAsync<ExamReviewDto>($"api/student/review/{AttemptId}");

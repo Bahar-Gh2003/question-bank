@@ -21,6 +21,7 @@ public static class ExamEligibilityCalculator
     public const string StatusReadyLastChance = "آماده تلاش مجدد (آخرین فرصت)";
     public const string StatusLocked          = "قفل";
     public const string StatusFailed          = "مردود";
+    public const string StatusAwaitingGrading = "در انتظار تصحیح";
 
     public static ExamEligibility Evaluate(
         Exam exam,
@@ -32,6 +33,11 @@ public static class ExamEligibilityCalculator
             .Where(a => a.IsCompleted)
             .OrderBy(a => a.AttemptedAt)
             .ToList();
+
+        // An attempt still waiting on the admin blocks everything else:
+        // the student may yet turn out to have passed it.
+        if (completed.Any(a => !a.IsGraded))
+            return new ExamEligibility(false, StatusAwaitingGrading, null);
 
         if (completed.Any(a => a.IsPassed))
             return new ExamEligibility(false, StatusPassed, null);

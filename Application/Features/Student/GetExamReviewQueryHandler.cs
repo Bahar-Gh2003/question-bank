@@ -1,3 +1,4 @@
+using Application.Common;
 using Application.Contracts;
 using Domain;
 using MediatR;
@@ -14,59 +15,72 @@ public class GetExamReviewQueryHandler : IRequestHandler<GetExamReviewQuery, Exa
 
     public async Task<ExamReviewDto> Handle(GetExamReviewQuery request, CancellationToken cancellationToken)
     {
-         var attempt = await _unitOfWork.ExamAttemptRepository.GetByIdAsync(request.AttemptId,
+        var attempt = await _unitOfWork.ExamAttemptRepository.GetByIdAsync(
+            request.AttemptId,
             include: q => q.Include(e => e.Exam).Include(sa => sa.StudentAnswers));
 
-        if (attempt == null || attempt.UserId != request.UserId)
-            throw new Exception("سابقه آزمون یافت نشد.");
+        if (attempt is null)
+            throw new NotFoundException("سابقه آزمون یافت نشد.");
 
-        // 1. Load every question from the exam the student attempted
-        var allExamQuestions = await _unitOfWork.QuestionRepository.GetAllAsync(
-            predicate: q => q.LevelId == attempt.Exam.LevelId,
-            include: q => q.Include(o => o.Options)
-        );
+        if (attempt.UserId != request.UserId)
+            throw new ForbiddenException("شما به این سابقه آزمون دسترسی ندارید.");
 
-        // 2. For each question, find the student's answer if one exists
-        var reviewQuestions = allExamQuestions.Select(q =>
+        // Only the questions this attempt actually contained. Questions are drawn at
+        // random per attempt, so reading the whole level pool would show the student
+        // questions they were never asked.
+        var questionIds = attempt.StudentAnswers.Select(sa => sa.QuestionId).ToList();
+        var questions = (await _unitOfWork.QuestionRepository.GetAllAsync(
+            predicate: q => questionIds.Contains(q.Id),
+            include: q => q.Include(o => o.Options))).ToList();
+
+        var reviewQuestions = attempt.StudentAnswers.Select(answer =>
         {
-            var studentAnswerRecord = attempt.StudentAnswers.FirstOrDefault(sa => sa.QuestionId == q.Id);
-            string studentAnswerText = "پاسخ داده نشده";
-            Guid? selectedOptionId = null;
-            bool isCorrect = false;
+            var question = questions.First(q => q.Id == answer.QuestionId);
 
-            if (studentAnswerRecord != null) // If the student submitted an answer
+            string studentAnswerText;
+            bool? isCorrect;
+
+            if (question.Type == QuestionType.MultipleChoice)
             {
-                if (q.Type == QuestionType.MultipleChoice)
-                {
-                    selectedOptionId = studentAnswerRecord.SelectedOptionId;
-                    studentAnswerText = q.Options.FirstOrDefault(o => o.Id == selectedOptionId)?.Content ?? "پاسخ داده نشده";
-                    var correctOptionId = q.Options.FirstOrDefault(o => o.IsCorrect)?.Id;
-                    isCorrect = selectedOptionId.HasValue && selectedOptionId == correctOptionId;
-                }
-                else
-                {
-                    studentAnswerText = studentAnswerRecord.ShortAnswerText ?? "پاسخ داده نشده";
-                }
+                studentAnswerText = question.Options
+                    .FirstOrDefault(o => o.Id == answer.SelectedOptionId)?.Content ?? "پاسخ داده نشده";
+
+                // Graded live during the exam, so this is always known
+                isCorrect = answer.IsCorrect ?? false;
+            }
+            else
+            {
+                studentAnswerText = string.IsNullOrWhiteSpace(answer.ShortAnswerText)
+                    ? "پاسخ داده نشده"
+                    : answer.ShortAnswerText;
+
+                // Null until the admin grades it; an unanswered question needs no grading
+                isCorrect = string.IsNullOrWhiteSpace(answer.ShortAnswerText)
+                    ? false
+                    : answer.IsCorrect;
             }
 
             return new ExamReviewQuestionDto
             {
-                Content = q.Content,
-                ImageUrl = q.ImageUrl,
-                Type = q.Type,
-                Options = q.Options.Select(o => new OptionDto { Id = o.Id, Content = o.Content, IsCorrect = o.IsCorrect }).ToList(),
+                Content = question.Content,
+                ImageUrl = question.ImageUrl,
+                Type = question.Type,
+                Options = question.Options
+                    .Select(o => new OptionDto { Id = o.Id, Content = o.Content, IsCorrect = o.IsCorrect })
+                    .ToList(),
                 StudentAnswer = studentAnswerText,
-                SelectedOptionId = selectedOptionId,
-                CorrectAnswer = q.Options.FirstOrDefault(o => o.IsCorrect)?.Content ?? "",
+                SelectedOptionId = answer.SelectedOptionId,
+                CorrectAnswer = question.Options.FirstOrDefault(o => o.IsCorrect)?.Content ?? "",
                 IsStudentAnswerCorrect = isCorrect,
-                Score = q.Score,
+                Score = question.Score
             };
         }).ToList();
 
         return new ExamReviewDto
         {
             ExamTitle = attempt.Exam.Title,
+            AwaitingGrading = !attempt.IsGraded,
             Questions = reviewQuestions
         };
-        }
+    }
 }

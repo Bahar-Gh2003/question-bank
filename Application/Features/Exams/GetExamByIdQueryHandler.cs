@@ -1,3 +1,4 @@
+using Application.Common;
 using Application.Contracts;
 using MediatR;
 using Shared.Admin;
@@ -16,14 +17,17 @@ public class GetExamByIdQueryHandler : IRequestHandler<GetExamByIdQuery, UpdateE
     public async Task<UpdateExamDto> Handle(GetExamByIdQuery request, CancellationToken cancellationToken)
     {
         var exam = await _unitOfWork.ExamRepository.GetByIdAsync(request.ExamId);
+        if (exam is null)
+            throw new NotFoundException("آزمون یافت نشد.");
+
         return new UpdateExamDto
         {
             Id = exam.Id,
             Title = exam.Title,
             LevelId = exam.LevelId,
-            // StartTime = exam.StartTime,
             DurationInMinutes = exam.DurationInMinutes,
-            PassingScore = exam.PassingScore
+            PassingScore = exam.PassingScore,
+            QuestionCount = exam.QuestionCount
         };
     }
 }

@@ -15,8 +15,6 @@ namespace Application.Features.Student;
 /// </summary>
 public class StartExamCommandHandler : IRequestHandler<StartExamCommand, ExamSessionDto>
 {
-    private const int QuestionsPerExam = 15; // TODO: this should be a field on Exam
-
     private readonly IUnitOfWork _unitOfWork;
     public StartExamCommandHandler(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
 
@@ -30,12 +28,16 @@ public class StartExamCommandHandler : IRequestHandler<StartExamCommand, ExamSes
             throw new NotFoundException("آزمون یافت نشد.");
 
         var student = await _unitOfWork.UserRepository.GetByIdAsync(request.UserId);
-        if (student is null)
+        if (student?.CurrentLevelId is null)
             throw new NotFoundException("کاربر یافت نشد.");
 
-        // Check 1: the exam must belong to the student's current level
-        if (student.CurrentLevelId != exam.LevelId)
-            throw new ForbiddenException("این آزمون مربوط به سطح فعلی شما نیست.");
+        var studentLevel = await _unitOfWork.LevelRepository.GetByIdAsync(student.CurrentLevelId.Value);
+        if (studentLevel is null)
+            throw new NotFoundException("سطح کاربر یافت نشد.");
+
+        // Check 1: the exam must be at or below the student's current level
+        if (exam.Level!.LevelNumber > studentLevel.LevelNumber)
+            throw new ForbiddenException("این آزمون مربوط به سطحی بالاتر از سطح فعلی شماست.");
 
         var attempts = (await _unitOfWork.ExamAttemptRepository.GetAllAsync(
             predicate: a => a.UserId == request.UserId && a.ExamId == request.ExamId)).ToList();
@@ -55,19 +57,25 @@ public class StartExamCommandHandler : IRequestHandler<StartExamCommand, ExamSes
                 predicate: a => a.UserId == request.UserId && a.ExamId == request.ExamId)).ToList();
         }
 
-        // Check 3: attempt count and waiting period - the same rules shown to the user
+        // Check 3: attempt count, waiting period and pending grading
         var eligibility = ExamEligibilityCalculator.Evaluate(exam, attempts, utcNow);
         if (!eligibility.CanStart)
             throw new BusinessRuleException($"امکان شروع این آزمون وجود ندارد. وضعیت فعلی: {eligibility.Status}");
 
-        // Pick the questions and build the session
-        var pool = await _unitOfWork.QuestionRepository.GetAllAsync(
+        // Draw a fresh random subset of the level's question pool for every attempt
+        var pool = (await _unitOfWork.QuestionRepository.GetAllAsync(
             predicate: q => q.LevelId == exam.LevelId,
-            include: q => q.Include(o => o.Options));
+            include: q => q.Include(o => o.Options))).ToList();
 
-        var selected = pool.OrderBy(_ => Guid.NewGuid()).Take(QuestionsPerExam).ToList();
-        if (selected.Count == 0)
+        if (pool.Count == 0)
             throw new BusinessRuleException("برای این آزمون هنوز سوالی تعریف نشده است.");
+
+        if (pool.Count < exam.QuestionCount)
+            throw new BusinessRuleException(
+                $"تعداد سوالات این سطح ({pool.Count}) کمتر از تعداد مورد نیاز آزمون ({exam.QuestionCount}) است. " +
+                "لطفاً به مدیر سامانه اطلاع دهید.");
+
+        var selected = pool.OrderBy(_ => Guid.NewGuid()).Take(exam.QuestionCount).ToList();
 
         var attempt = new ExamAttempt
         {
@@ -77,7 +85,8 @@ public class StartExamCommandHandler : IRequestHandler<StartExamCommand, ExamSes
             LevelId = exam.LevelId,
             StartedAt = utcNow,
             AttemptedAt = utcNow,
-            IsCompleted = false
+            IsCompleted = false,
+            IsGraded = false
         };
 
         // The chosen questions are stored now so that at submit time
@@ -107,16 +116,18 @@ public class StartExamCommandHandler : IRequestHandler<StartExamCommand, ExamSes
         if (full is null) return;
 
         var questionIds = full.StudentAnswers.Select(a => a.QuestionId).ToList();
-        var questions = await _unitOfWork.QuestionRepository.GetAllAsync(
-            predicate: q => questionIds.Contains(q.Id));
+        var questions = (await _unitOfWork.QuestionRepository.GetAllAsync(
+            predicate: q => questionIds.Contains(q.Id))).ToList();
 
         full.Score = full.StudentAnswers
             .Where(a => a.IsCorrect == true)
             .Sum(a => questions.First(q => q.Id == a.QuestionId).Score);
 
+        // An abandoned attempt has no short answers worth grading, so it is final immediately.
         full.IsPassed = full.Score >= exam.PassingScore;
         full.AttemptedAt = endsAt;
         full.IsCompleted = true;
+        full.IsGraded = true;
 
         _unitOfWork.ExamAttemptRepository.Update(full);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -128,9 +139,9 @@ public class StartExamCommandHandler : IRequestHandler<StartExamCommand, ExamSes
             attemptId, include: a => a.Include(x => x.StudentAnswers));
 
         var questionIds = attempt!.StudentAnswers.Select(a => a.QuestionId).ToList();
-        var questions = await _unitOfWork.QuestionRepository.GetAllAsync(
+        var questions = (await _unitOfWork.QuestionRepository.GetAllAsync(
             predicate: q => questionIds.Contains(q.Id),
-            include: q => q.Include(o => o.Options));
+            include: q => q.Include(o => o.Options))).ToList();
 
         var dtos = attempt.StudentAnswers.Select(sa =>
         {

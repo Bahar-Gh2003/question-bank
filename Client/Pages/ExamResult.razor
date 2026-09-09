@@ -1,4 +1,5 @@
 @page "/exam-result/{IsPassed:bool}/{TotalScore:int}"
+@page "/exam-result/{IsPassed:bool}/{TotalScore:int}/{AwaitingGrading:bool}"
 @attribute [Authorize(Roles = "Student")]
 @inject NavigationManager NavigationManager
 @using Client.Helpers
@@ -8,20 +9,48 @@
 <MudGrid Justify="Justify.Center" Class="mt-16">
     <MudItem xs="12" sm="8" md="6">
         <MudPaper Elevation="3" Class="pa-6">
-            @if (IsPassed)
+            @if (AwaitingGrading)
             {
-                <MudAlert Severity="Severity.Success" Variant="Variant.Filled" Class="mb-4">تبریک! شما در این آزمون قبول شدید</MudAlert>
+                <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="mb-4">
+                    آزمون شما ثبت شد
+                </MudAlert>
+                <MudText Typo="Typo.h6">
+                    این آزمون سوال تشریحی دارد. نمره نهایی و وضعیت قبولی پس از تصحیح توسط مدیر مشخص می‌شود.
+                </MudText>
+
+                <MudText Typo="Typo.h5" Class="my-4">
+                    نمره سوالات تستی:
+                    <MudChip T="int" Color="Color.Primary" Size="Size.Large">@(TotalScore.ToPersianDigits())</MudChip>
+                </MudText>
+
+                <MudAlert Severity="Severity.Normal" Dense="true" Class="mb-2">
+                    تا زمانی که این آزمون تصحیح نشود، امکان شرکت در تلاش بعدی وجود ندارد.
+                </MudAlert>
+            }
+            else if (IsPassed)
+            {
+                <MudAlert Severity="Severity.Success" Variant="Variant.Filled" Class="mb-4">
+                    تبریک! شما در این آزمون قبول شدید
+                </MudAlert>
                 <MudText Typo="Typo.h5">کارتان عالی بود!</MudText>
+
+                <MudText Typo="Typo.h4" Class="my-4">
+                    نمره شما:
+                    <MudChip T="int" Color="Color.Primary" Size="Size.Large">@(TotalScore.ToPersianDigits())</MudChip>
+                </MudText>
             }
             else
             {
-                <MudAlert Severity="Severity.Warning" Variant="Variant.Filled" Class="mb-4">متاسفانه شما نمره قبولی را کسب نکردید</MudAlert>
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Filled" Class="mb-4">
+                    متاسفانه شما نمره قبولی را کسب نکردید
+                </MudAlert>
                 <MudText Typo="Typo.h5">بیشتر تلاش کنید!</MudText>
-            }
 
-            <MudText Typo="Typo.h4" Class="my-4">
-                نمره شما: <MudChip T="int" Color="Color.Primary" Size="Size.Large">@(TotalScore.ToPersianDigits())</MudChip>
-            </MudText>
+                <MudText Typo="Typo.h4" Class="my-4">
+                    نمره شما:
+                    <MudChip T="int" Color="Color.Primary" Size="Size.Large">@(TotalScore.ToPersianDigits())</MudChip>
+                </MudText>
+            }
 
             <div class="d-flex justify-space-between mt-4">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/results" Style="width: 48%;">
@@ -36,9 +65,7 @@
 </MudGrid>
 
 @code {
-    [Parameter]
-    public bool IsPassed { get; set; }
-
-    [Parameter]
-    public int TotalScore { get; set; }
+    [Parameter] public bool IsPassed { get; set; }
+    [Parameter] public int TotalScore { get; set; }
+    [Parameter] public bool AwaitingGrading { get; set; }
 }

@@ -10,8 +10,13 @@ public class ExamReviewQuestionDto
     public List<OptionDto> Options { get; set; } = new();
     public string StudentAnswer { get; set; }
     public string CorrectAnswer { get; set; }
-    public bool IsStudentAnswerCorrect { get; set; }
+
+    /// <summary>
+    /// Null means the admin has not graded this answer yet.
+    /// Only ever null for short-answer questions.
+    /// </summary>
+    public bool? IsStudentAnswerCorrect { get; set; }
+
     public int Score { get; set; }
     public Guid? SelectedOptionId { get; set; }
-    
 }

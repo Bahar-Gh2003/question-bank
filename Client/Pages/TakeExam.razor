@@ -234,7 +234,7 @@ else if (_examSession is not null)
             var result = await response.Content.ReadFromJsonAsync<ExamResultDto>();
             if (result is not null)
             {
-                NavigationManager.NavigateTo($"/exam-result/{result.IsPassed}/{result.TotalScore}");
+                NavigationManager.NavigateTo($"/exam-result/{result.IsPassed}/{result.TotalScore}/{result.AwaitingGrading}");
                 return;
             }
         }

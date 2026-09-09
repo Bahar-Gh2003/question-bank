@@ -1,6 +1,7 @@
 @page "/admin/manage-exams"
 @attribute [Authorize(Roles = "Admin")]
 @using System.Globalization
+@using System.Net.Http.Json
 @using Client.Helpers
 @using Shared.Admin
 @inject HttpClient Http
@@ -27,17 +28,19 @@
                 }
             </MudSelect>
 
-            @* <MudText Typo="Typo.h6" Class="mt-4">تاریخ شروع</MudText> *@
-            @* <MudGrid Spacing="2"> *@
-            @*     <MudItem xs="4"><MudNumericField Label="روز" @bind-Value="_jalaliDay" Min="1" Max="31" Variant="Variant.Outlined" /></MudItem> *@
-            @*     <MudItem xs="4"><MudNumericField Label="ماه" @bind-Value="_jalaliMonth" Min="1" Max="12" Variant="Variant.Outlined" /></MudItem> *@
-            @*     <MudItem xs="4"><MudNumericField Label="سال" @bind-Value="_jalaliYear" Min="1403" Variant="Variant.Outlined" /></MudItem> *@
-            @* </MudGrid> *@
+            <MudNumericField Label="مدت زمان (دقیقه)" @bind-Value="_createExamDto.DurationInMinutes" Variant="Variant.Outlined" Class="mt-4" Min="1" Max="600"/>
+            <MudNumericField Label="حداقل نمره قبولی" @bind-Value="_createExamDto.PassingScore" Variant="Variant.Outlined" Class="mt-4" Min="0"/>
 
-            @* <MudTimePicker Label="ساعت شروع" @bind-Time="_selectedTime" Variant="Variant.Outlined" Class="mt-4" /> *@
-            <MudNumericField Label="مدت زمان (دقیقه)" @bind-Value="_createExamDto.DurationInMinutes" Variant="Variant.Outlined" Class="mt-4"/>
-            <MudNumericField Label="حداقل نمره قبولی" @bind-Value="_createExamDto.PassingScore" Variant="Variant.Outlined" Class="mt-4"/>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-4" OnClick="HandleCreateExam">ایجاد آزمون</MudButton>
+            <MudNumericField Label="تعداد سوالات آزمون"
+                             @bind-Value="_createExamDto.QuestionCount"
+                             Variant="Variant.Outlined" Class="mt-4"
+                             Min="1" Max="200"
+                             HelperText="سوالات به صورت تصادفی از سوالات همین سطح انتخاب می‌شوند و برای هر تلاش، مجموعه جدیدی انتخاب می‌شود."
+                             HelperTextOnFocus="false"/>
+
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-4" OnClick="HandleCreateExam" Disabled="@_isSaving">
+                ایجاد آزمون
+            </MudButton>
         </MudPaper>
         </div>
     </MudTabPanel>
@@ -52,17 +55,25 @@
             <MudTable Items="@_allExams" Hover="true" Striped="true"
                       Style="width:100%" TableLayout="TableLayout.Fixed">
                 <HeaderContent>
-                    <MudTh Style="width:25%">عنوان آزمون</MudTh>
-                    <MudTh Style="width:25%">سطح</MudTh>
-                    @* <MudTh>زمان شروع</MudTh> *@
-                    <MudTh Style="width:25%">مدت</MudTh>
-                    <MudTh Style="width:25%">عملیات</MudTh>
+                    <MudTh Style="width:22%">عنوان آزمون</MudTh>
+                    <MudTh Style="width:18%">سطح</MudTh>
+                    <MudTh Style="width:15%">مدت</MudTh>
+                    <MudTh Style="width:25%">تعداد سوالات</MudTh>
+                    <MudTh Style="width:20%">عملیات</MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="عنوان">@context.Title</MudTd>
                     <MudTd DataLabel="سطح">@context.LevelTitle</MudTd>
-                    @* <MudTd DataLabel="زمان شروع">@ToPersianDateTimeString(context.StartTime)</MudTd> *@
                     <MudTd DataLabel="مدت">@context.DurationInMinutes.ToPersianDigits() دقیقه </MudTd>
+                    <MudTd DataLabel="تعداد سوالات">
+                        @context.QuestionCount.ToPersianDigits() از @context.AvailableQuestionCount.ToPersianDigits()
+                        @if (context.AvailableQuestionCount < context.QuestionCount)
+                        {
+                            <MudTooltip Text="سوالات این سطح برای اجرای آزمون کافی نیست">
+                                <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Small" Class="ml-1"/>
+                            </MudTooltip>
+                        }
+                    </MudTd>
                     <MudTd DataLabel="عملیات">
                         <MudTooltip Text="مشاهده نتایج">
                             <MudIconButton Href="@($"/admin/exam-results/{context.Id}")" Icon="@Icons.Material.Filled.Leaderboard" Color="Color.Info" Size="Size.Small"/>
@@ -86,11 +97,13 @@
 @code {
     private CreateExamDto _createExamDto = new();
     private List<LevelDto>? _levels;
+
     [Parameter, SupplyParameterFromQuery]
     public string? Tab { get; set; }
 
     private int _activeTabIndex = 0;
-    
+    private bool _isSaving;
+
     private List<AdminExamListDto>? _allExams;
 
     protected override async Task OnInitializedAsync()
@@ -113,7 +126,6 @@
         StateHasChanged();
     }
 
-    
     private async Task ConfirmDelete(Guid examId, string title)
     {
         var result = await DialogService.ShowMessageBox("تایید حذف", $"آیا از حذف آزمون «{title}» مطمئن هستید؟", yesText: "حذف", cancelText: "لغو");
@@ -128,8 +140,7 @@
             else
             {
                 // Read and display the specific error message returned by the API
-                var errorMessage = await response.Content.ReadAsStringAsync();
-                Snackbar.Add(errorMessage, Severity.Error);
+                Snackbar.Add(await ReadErrorMessageAsync(response, "خطا در حذف آزمون."), Severity.Error);
             }
         }
     }
@@ -141,18 +152,50 @@
             Snackbar.Add("لطفاً سطح آزمون را انتخاب کنید.", Severity.Warning);
             return;
         }
-        
-        
-        var response = await Http.PostAsJsonAsync("api/Exams", _createExamDto);
-        if (response.IsSuccessStatusCode)
+
+        if (_createExamDto.QuestionCount < 1)
         {
-            Snackbar.Add("آزمون با موفقیت ایجاد شد.", Severity.Success);
-            _createExamDto = new();
-            await LoadAllExams();
+            Snackbar.Add("تعداد سوالات آزمون باید حداقل ۱ باشد.", Severity.Warning);
+            return;
         }
-        else
+
+        _isSaving = true;
+        try
         {
-            Snackbar.Add("خطا در ایجاد آزمون.", Severity.Error);
+            var response = await Http.PostAsJsonAsync("api/Exams", _createExamDto);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("آزمون با موفقیت ایجاد شد.", Severity.Success);
+                _createExamDto = new();
+                await LoadAllExams();
+            }
+            else
+            {
+                // The server explains exactly what went wrong (e.g. not enough questions in this level)
+                Snackbar.Add(await ReadErrorMessageAsync(response, "خطا در ایجاد آزمون."), Severity.Error);
+            }
         }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private static async Task<string> ReadErrorMessageAsync(HttpResponseMessage response, string fallback)
+    {
+        try
+        {
+            var problem = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+            return string.IsNullOrWhiteSpace(problem?.Message) ? fallback : problem.Message;
+        }
+        catch
+        {
+            return fallback;
+        }
+    }
+
+    private class ErrorResponse
+    {
+        public string? Message { get; set; }
     }
 }

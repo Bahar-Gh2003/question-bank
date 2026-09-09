@@ -14,6 +14,13 @@ public class ExamAttempt : BaseEntity
     /// <summary>While false the attempt is still open and does not count towards the attempt limit.</summary>
     public bool IsCompleted { get; set; }
 
+    /// <summary>
+    /// False while short-answer questions are still waiting for the admin to grade them.
+    /// Score and IsPassed are provisional until this becomes true, and the student
+    /// cannot start their next attempt in the meantime.
+    /// </summary>
+    public bool IsGraded { get; set; }
+
     public Guid UserId { get; set; }
     public User User { get; set; }
 
