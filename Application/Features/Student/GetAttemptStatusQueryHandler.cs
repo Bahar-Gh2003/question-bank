@@ -1,3 +1,4 @@
+using Application.Common;
 using Application.Contracts;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -13,45 +14,47 @@ public class GetAttemptStatusQueryHandler : IRequestHandler<GetAttemptStatusQuer
 
     public async Task<AttemptStatusDto> Handle(GetAttemptStatusQuery request, CancellationToken cancellationToken)
     {
-        
-        var studentAttempt = await _unitOfWork.ExamAttemptRepository.GetByIdAsync(request.AttemptId,
-            include: a => a.Include(e => e.Exam));
+        var studentAttempt = await _unitOfWork.ExamAttemptRepository.GetByIdAsync(
+            request.AttemptId,
+            include: a => a.Include(e => e.Exam).Include(sa => sa.StudentAnswers));
 
-        if (studentAttempt == null || studentAttempt.UserId != request.UserId)
-            throw new Exception("Attempt not found.");
+        if (studentAttempt is null)
+            throw new NotFoundException("سابقه آزمون یافت نشد.");
 
-        // 1. Get all attempts for this specific exam
-        var allAttemptsForExam = await _unitOfWork.ExamAttemptRepository.GetAllAsync(
-            predicate: a => a.ExamId == studentAttempt.ExamId
-        );
+        if (studentAttempt.UserId != request.UserId)
+            throw new ForbiddenException("شما به این سابقه آزمون دسترسی ندارید.");
 
-        // 2. Group all attempts by user and assign an attempt number to each
+        // Only finished attempts take part in ranking; an attempt still in progress
+        // would otherwise show up with a score of zero.
+        var allAttemptsForExam = (await _unitOfWork.ExamAttemptRepository.GetAllAsync(
+            predicate: a => a.ExamId == studentAttempt.ExamId && a.IsCompleted)).ToList();
+
+        // Group all attempts by user and assign an attempt number to each
         var attemptsWithNumbers = allAttemptsForExam
             .GroupBy(a => a.UserId)
             .SelectMany(g => g.OrderBy(a => a.AttemptedAt)
                               .Select((attempt, index) => new { Attempt = attempt, AttemptNumber = index + 1 }))
             .ToList();
 
-        // 3. Find the attempt number for the specific attempt the student is viewing
         var studentAttemptInfo = attemptsWithNumbers.FirstOrDefault(a => a.Attempt.Id == request.AttemptId);
-        if (studentAttemptInfo == null)
-            throw new Exception("Could not determine attempt number.");
-        
-        var studentAttemptNumber = studentAttemptInfo.AttemptNumber;
+        if (studentAttemptInfo is null)
+            throw new NotFoundException("شماره تلاش این آزمون قابل تشخیص نیست.");
 
-        // 4. Filter the list to include only attempts with the same attempt number
+        // Compare like with like: only attempts of the same number are ranked together
         var relevantAttempts = attemptsWithNumbers
-            .Where(a => a.AttemptNumber == studentAttemptNumber)
+            .Where(a => a.AttemptNumber == studentAttemptInfo.AttemptNumber)
             .Select(a => a.Attempt)
             .ToList();
 
-        // 5. Get all questions to calculate the total score
+        // The maximum score comes from the questions THIS attempt contained.
+        // Questions are drawn at random per attempt, so summing the whole level's
+        // question pool would report a maximum the student was never asked for.
+        var questionIds = studentAttempt.StudentAnswers.Select(sa => sa.QuestionId).ToList();
         var questions = await _unitOfWork.QuestionRepository.GetAllAsync(
-            predicate: q => q.LevelId == studentAttempt.Exam.LevelId
-        );
+            predicate: q => questionIds.Contains(q.Id));
+
         var totalExamScore = questions.Sum(q => q.Score);
 
-        // 6. Perform all calculations on the correctly filtered list
         var rankedAttempts = relevantAttempts.OrderByDescending(a => a.Score).ToList();
         var studentRank = rankedAttempts.FindIndex(a => a.UserId == studentAttempt.UserId) + 1;
 
@@ -59,6 +62,7 @@ public class GetAttemptStatusQueryHandler : IRequestHandler<GetAttemptStatusQuer
         {
             StudentScore = studentAttempt.Score,
             IsPassed = studentAttempt.IsPassed,
+            AwaitingGrading = !studentAttempt.IsGraded,
             TotalExamScore = totalExamScore,
             Rank = studentRank,
             TotalParticipants = rankedAttempts.Count,
